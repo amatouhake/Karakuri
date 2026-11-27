@@ -44,6 +44,15 @@ std::unique_ptr<Job> makeApproach(BlockPos block, float reach);
 std::unique_ptr<Job> makeMine(BlockPos pos);
 std::unique_ptr<Job> makePlace(BlockPos pos);
 std::unique_ptr<Job> makeEat();
+// Crafts `count` of `item` (e.g. "oak_planks"). Recipes needing a 3x3 grid use a crafting table
+// within reach: walks to one nearby, or places one from the hotbar.
+std::unique_ptr<Job> makeCraft(std::string item, int count);
+// Smelts `count` of `item` in a furnace nearby (or one placed from the hotbar), adding fuel from
+// the inventory, and takes the result.
+std::unique_ptr<Job> makeSmelt(std::string item, int count);
+// Moves items between the inventory and a chest (the nearest one, or the one at `pos`).
+// An empty `item` means any item; count <= 0 means all.
+std::unique_ptr<Job> makeChest(bool put, std::string item, int count, std::optional<BlockPos> pos);
 // Walks over dropped items within `radius` until none are left (or none can be reached).
 std::unique_ptr<Job> makeCollect(float radius = 8.0f);
 // Attacks `target`, or the nearest monster within `radius` when no target is given.

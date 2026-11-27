@@ -1,5 +1,6 @@
 // Unit tests for the pure core (no game types). Run: xmake build KarakuriTests && xmake run KarakuriTests
 
+#include "core/Crafting.h"
 #include "core/Events.h"
 #include "core/Inventory.h"
 #include "core/Job.h"
@@ -111,6 +112,24 @@ void inventoryDiff() {
     check(diffCounts(before, before).empty(), "no change, empty diff");
 }
 
+void crafting() {
+    // Wooden pickaxe: 3 planks (any kind) + 2 sticks.
+    std::vector<Requirement> pickaxe{{{"oak_planks", "birch_planks"}, 3}, {{"stick"}, 2}};
+    auto mixed = allocate(pickaxe, {{"oak_planks", 2}, {"birch_planks", 2}, {"stick", 5}});
+    check(mixed.has_value(), "pickaxe: mixed planks are accepted");
+    check(mixed && (*mixed)["stick"] == 2 && (*mixed)["oak_planks"] + (*mixed)["birch_planks"] == 3, "pickaxe: takes 3 planks and 2 sticks");
+    check(!allocate(pickaxe, {{"oak_planks", 3}, {"stick", 1}}).has_value(), "pickaxe: one stick short");
+    check(!allocate(pickaxe, {{"oak_planks", 5}, {"stick", 4}}, 2).has_value(), "two pickaxes need 6 planks");
+    check(allocate(pickaxe, {{"oak_planks", 6}, {"stick", 4}}, 2).has_value(), "two pickaxes with enough");
+
+    // A flexible slot must not use up the item a strict slot needs.
+    std::vector<Requirement> tricky{{{"coal", "charcoal"}, 1}, {{"coal"}, 1}};
+    auto t = allocate(tricky, {{"coal", 1}, {"charcoal", 1}});
+    check(t && (*t)["coal"] == 1 && (*t)["charcoal"] == 1, "strict slots are filled first");
+
+    check(craftsFor(5, 4) == 2 && craftsFor(4, 4) == 1 && craftsFor(1, 1) == 1, "crafts needed round up");
+}
+
 void reach() {
     check(withinReach(0, 0, 0, 3, 4, 0, 5), "distance 5 is within reach 5");
     check(!withinReach(0, 0, 0, 3, 4, 0.1f, 5), "just over reach is out");
@@ -126,6 +145,7 @@ int main() {
     reach();
     events();
     inventoryDiff();
+    crafting();
     pathfinderTests();
     if (gFailures == 0) std::printf("all tests passed\n");
     return gFailures == 0 ? 0 : 1;

@@ -1,6 +1,7 @@
 #include "mod/Jobs.h"
 
 #include "mod/Game.h"
+#include "mod/World.h"
 
 #include "ll/api/service/Bedrock.h"
 
@@ -63,6 +64,7 @@ public:
             if (isAir(region, mPos)) return mBlock.empty() ? JobStep::fail("block is air") : JobStep::done();
             if (auto r = approach(sp, mApproach, mPos); r) return *r;
             mBlock = blockName(region, mPos);
+            sp.setSelectedSlot(bestToolSlot(sp, region.getBlock(mPos)));
             sp.simulateLookAt(center(mPos), sim::LookDuration::Instant);
             if (!sp.simulateDestroyBlock(mPos, faceToward(mPos, sp.getEyePos())))
                 return JobStep::fail("engine refused to start breaking");

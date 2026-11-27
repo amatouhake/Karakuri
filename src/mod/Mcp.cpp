@@ -265,6 +265,12 @@ json startJob(json const& a, std::function<std::unique_ptr<Job>(json const&)> ma
     return out;
 }
 
+std::unique_ptr<Job> chestJob(json const& a, bool put) {
+    std::optional<BlockPos> pos;
+    if (a.contains("x") && a.contains("y") && a.contains("z")) pos = blockArg(a);
+    return makeChest(put, a.value("item", ""), optInt(a, "count", 0), pos);
+}
+
 std::vector<Tool> const& tools() {
     static std::vector<Tool> const t = {
         {"list_bots", "List the bots by name.", obj(json::object(), {}), [](json const&) {
@@ -299,9 +305,8 @@ std::vector<Tool> const& tools() {
          obj({{"bot", kBot}, {"x", kInt}, {"y", kInt}, {"z", kInt}, {"wait_seconds", kWait}}, {"bot", "x", "y", "z"}),
          [](json const& a) { return startJob(a, [](json const& a) { return makePathGoto(blockArg(a)); }); }},
         {"mine",
-         "Break block (x,y,z), walking within reach first. Uses the best hotbar tool only while pathing; for the "
-         "block itself it uses the held item (see hold). The drop stays on the ground unless the bot stands on it: "
-         "call collect_items afterwards. Replaces the current job.",
+         "Break block (x,y,z), walking within reach first, with the best tool in the hotbar. The drop stays on the "
+         "ground unless the bot stands on it: call collect_items afterwards. Replaces the current job.",
          obj({{"bot", kBot}, {"x", kInt}, {"y", kInt}, {"z", kInt}, {"wait_seconds", kWait}}, {"bot", "x", "y", "z"}),
          [](json const& a) { return startJob(a, [](json const& a) { return makeMine(blockArg(a)); }); }},
         {"place",
@@ -325,6 +330,36 @@ std::vector<Tool> const& tools() {
          [](json const& a) {
              return startJob(a, [](json const& a) { return makeCollect((float)std::clamp(optInt(a, "radius", 8), 1, 16)); });
          }},
+        {"craft",
+         "Craft items by name (e.g. oak_planks, stick, crafting_table, wooden_pickaxe, furnace, iron_pickaxe) from "
+         "the inventory, using the game's recipes. 3x3 recipes need a crafting table within reach: the bot walks to one "
+         "within 16 blocks or places one from its hotbar. inventory_change in the result shows what was made and used.",
+         obj({{"bot", kBot}, {"item", {{"type", "string"}}}, {"count", kInt}, {"wait_seconds", kWait}}, {"bot", "item"}),
+         [](json const& a) {
+             return startJob(a, [](json const& a) { return makeCraft(str(a, "item"), optInt(a, "count", 1)); });
+         }},
+        {"smelt",
+         "Smelt items (e.g. raw_iron, oak_log, sand) in a furnace within 16 blocks, or one placed from the hotbar. "
+         "Fuel (coal, charcoal, logs, planks, sticks) comes from the inventory. Takes about 10 seconds per item; the "
+         "result is taken back into the inventory.",
+         obj({{"bot", kBot}, {"item", {{"type", "string"}}}, {"count", kInt}, {"wait_seconds", kWait}}, {"bot", "item"}),
+         [](json const& a) {
+             return startJob(a, [](json const& a) { return makeSmelt(str(a, "item"), optInt(a, "count", 1)); });
+         }},
+        {"chest_put",
+         "Put items from the inventory into a chest: the nearest one within 16 blocks, or the one at x,y,z. Omit item "
+         "for any item, omit count for all.",
+         obj({{"bot", kBot}, {"item", {{"type", "string"}}}, {"count", kInt}, {"x", kInt}, {"y", kInt}, {"z", kInt},
+              {"wait_seconds", kWait}},
+             {"bot"}),
+         [](json const& a) { return startJob(a, [](json const& a) { return chestJob(a, true); }); }},
+        {"chest_take",
+         "Take items from a chest into the inventory: the nearest one within 16 blocks, or the one at x,y,z. Omit item "
+         "for any item, omit count for all.",
+         obj({{"bot", kBot}, {"item", {{"type", "string"}}}, {"count", kInt}, {"x", kInt}, {"y", kInt}, {"z", kInt},
+              {"wait_seconds", kWait}},
+             {"bot"}),
+         [](json const& a) { return startJob(a, [](json const& a) { return chestJob(a, false); }); }},
         {"attack", "Attack the nearest monster within 16 blocks.", obj({{"bot", kBot}, {"wait_seconds", kWait}}, {"bot"}),
          [](json const& a) { return startJob(a, [](json const&) { return makeAttack(std::nullopt); }); }},
         {"stop", "Cancel the current job.", obj({{"bot", kBot}}, {"bot"}), [](json const& a) {
@@ -419,7 +454,8 @@ json handle(json const& msg) {
             {"capabilities", {{"tools", json::object()}}},
             {"serverInfo", {{"name", "karakuri"}, {"version", "0.1.0"}}},
             {"instructions",
-             "Karakuri drives survival bots on a Minecraft Bedrock server. Jobs (goto, mine, place, eat, attack) run "
+             "Karakuri drives survival bots on a Minecraft Bedrock server. Jobs (goto, mine, place, craft, smelt, chest_put, "
+             "chest_take, collect_items, eat, attack) run "
              "in the background: pass wait_seconds to wait for the result, or call wait_for_event with the returned "
              "event_cursor. Use bot_status, find_blocks, nearby_entities and get_block to look around. Coordinates "
              "are block coordinates; y is up."},

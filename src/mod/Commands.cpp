@@ -43,6 +43,18 @@ struct BotToggle {
     SoftEnum<BotName> bot;
     Toggle            state;
 };
+struct BotItem {
+    SoftEnum<BotName> bot;
+    std::string       item;
+    Optional<int>     count;
+};
+enum class ChestOp : int { put, take };
+struct BotChest {
+    SoftEnum<BotName> bot;
+    ChestOp           op;
+    std::string       item; // "all" for any item
+    Optional<int>     count;
+};
 struct BotSlot {
     SoftEnum<BotName> bot;
     int               slot;
@@ -138,6 +150,27 @@ void registerCommands() {
     cmd.overload<OneBot>().text("eat").required("bot").execute(
         [&bots](CommandOrigin const&, CommandOutput& out, OneBot const& p) {
             reply(out, bots.assign(p.bot, makeEat()), "eat started");
+        }
+    );
+    cmd.overload<BotItem>().text("craft").required("bot").required("item").optional("count").execute(
+        [&bots](CommandOrigin const&, CommandOutput& out, BotItem const& p) {
+            reply(out, bots.assign(p.bot, makeCraft(p.item, p.count.has_value() ? *p.count : 1)), "craft started");
+        }
+    );
+    cmd.overload<BotItem>().text("smelt").required("bot").required("item").optional("count").execute(
+        [&bots](CommandOrigin const&, CommandOutput& out, BotItem const& p) {
+            reply(out, bots.assign(p.bot, makeSmelt(p.item, p.count.has_value() ? *p.count : 1)), "smelt started");
+        }
+    );
+    cmd.overload<BotChest>().text("chest").required("bot").required("op").required("item").optional("count").execute(
+        [&bots](CommandOrigin const&, CommandOutput& out, BotChest const& p) {
+            auto job = makeChest(
+                p.op == ChestOp::put,
+                p.item == "all" ? "" : p.item,
+                p.count.has_value() ? *p.count : 0,
+                std::nullopt
+            );
+            reply(out, bots.assign(p.bot, std::move(job)), "chest job started");
         }
     );
     cmd.overload<OneBot>().text("collect").required("bot").execute(
