@@ -11,16 +11,22 @@ A [LeviLamina](https://github.com/LiteLDev/LeviLamina) mod for Bedrock Dedicated
 
 ## Status
 
-**Early design stage. There is nothing to install yet.**
+**Early prototype. No release yet; expect everything to change.**
 
 What exists today:
 
+- Bots you can spawn and give simple jobs from commands: walk, mine, place,
+  eat and attack, with reflexes that fight back and eat on their own. What
+  was seen working on a live server, and what was not checked yet, is in
+  [docs/VALIDATION.md](docs/VALIDATION.md).
 - [Design notes](docs/DESIGN.md): goals, the layered AI architecture, the bot
-  API, and the plan for the first prototype.
-- [Spike 0](docs/SPIKE-0.md): a feasibility probe that spawned one
-  `SimulatedPlayer` on a live LeviLamina server and checked survival basics
-  (damage, death, respawn, hunger, eating, sleeping, break times, pickup,
-  navigation). Its code is in [`spike/`](spike).
+  API, and the plan.
+- [Spike 0](docs/SPIKE-0.md): what BDS's `SimulatedPlayer` does on a live
+  server, which shaped the design. Its probe code is in [`spike/`](spike).
+
+Not there yet: a pathfinder that digs and builds (the engine's navigation only
+walks, and only up to 16 blocks), crafting, furnaces, chests, and the agent interface
+(MCP).
 
 ## What it aims to be
 
@@ -37,12 +43,33 @@ What exists today:
 
 The intended users are server operators and their players.
 
+## Commands
+
+`/karakuri` (alias `/kr`), operator only. Bot names are registered for command completion (not yet checked in a client).
+
+| Command | What it does |
+|---|---|
+| `kr spawn <name> [pos]` | Spawn a survival bot (at your position when run by a player) |
+| `kr remove <bot>` / `kr list` | Remove a bot / list bots |
+| `kr status <bot>` | Position, health, hunger, current job, last result, inventory |
+| `kr goto <bot> <pos>` | Walk to a position up to 16 blocks away (walking only, for now) |
+| `kr mine <bot> <pos>` | Break a block within reach, with whatever the bot holds |
+| `kr place <bot> <pos>` | Place the held block at a position within reach |
+| `kr hold <bot> <slot>` | Select a hotbar slot (0–8) |
+| `kr eat <bot>` | Eat food from the hotbar |
+| `kr attack <bot>` | Attack the nearest monster |
+| `kr stop <bot>` | Cancel the current job |
+| `kr reflexes <bot> on\|off` | Turn the automatic fight and eat reflexes on or off |
+
+Jobs run in the background; their results go to the server log and to
+`kr status`. A dead bot respawns on its own after one second.
+
 ## Platform
 
 - LeviLamina 26.60.x on BDS 1.26.60.6, Windows x64.
 - Bots are BDS `SimulatedPlayer` instances, exposed by LeviLamina.
 
-## Building the spike
+## Building
 
 Requirements: Windows x64, Visual Studio 2022 (MSVC and Windows SDK),
 [xmake](https://xmake.io), and **LLVM 22** (`clang-cl`). The clang bundled
@@ -50,16 +77,16 @@ with Visual Studio is too old to build the LeviLamina server SDK.
 
 ```powershell
 $env:PATH = "C:\Program Files\LLVM\bin;$env:PATH"
-cd spike
 xmake f -p windows -a x64 -m release -y
-xmake build KarakuriSpike
+xmake build Karakuri
+xmake build KarakuriTests; xmake run KarakuriTests
 ```
 
 The first configure builds the LeviLamina SDK from source and takes a while.
-Copy `bin/KarakuriSpike/` into the `mods/` folder of a LeviLamina server.
-On the server console, `kspike spawn <x> <y> <z>` spawns a bot named `kbot`;
-see `handle()` in [`spike/src/Mod.cpp`](spike/src/Mod.cpp) for the other
-actions. The spike is a probe, not a usable feature.
+Copy `bin/Karakuri/` into the `mods/` folder of a LeviLamina server.
+
+For testing without a client, [`tools/bds_driver.py`](tools/bds_driver.py)
+runs the server and forwards lines appended to a file to its console.
 
 ## Contributing
 

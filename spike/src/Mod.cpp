@@ -251,6 +251,15 @@ void handle(Params const& p, CommandOutput& out) {
         bool ok = sp->simulateInteract(pos, ScriptModuleMinecraft::ScriptFacing::Up);
         report("interact block=({},{},{}) {} ok={} after: {}", p.x, p.y, p.z,
                blockName(sp->getDimensionBlockSource(), pos), ok, describe(*sp));
+    } else if (a == "place") {
+        // Place the selected item on top of block (x,y,z).
+        BlockPos pos{p.x, p.y, p.z};
+        sp->simulateLookAt(Vec3(pos) + Vec3{0.5f, 1.0f, 0.5f}, sim::LookDuration::Instant);
+        bool ok = sp->simulateUseItemInSlotOnBlock(sp->getSelectedItemSlot(), pos,
+            ScriptModuleMinecraft::ScriptFacing::Up, Vec3{0.5f, 1.0f, 0.5f});
+        BlockPos above{p.x, p.y + 1, p.z};
+        report("place on=({},{},{}) ok={} above={} inv=[{}]", p.x, p.y, p.z, ok,
+               blockName(sp->getDimensionBlockSource(), above), inventorySummary(*sp));
     } else if (a == "attack") {
         // Attack whatever the bot is looking at.
         bool ok = sp->simulateAttack();
