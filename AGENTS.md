@@ -12,10 +12,11 @@ agents. This file is the working manual for coding agents.
   on a live server.
 - [docs/VALIDATION.md](docs/VALIDATION.md): what the mod was seen to do, per
   build. A server result goes there with the DLL hash.
-- `src/core`: pure logic (jobs, reflex arbitration) without game types,
-  tested in `tests/`.
-- `src/mod`: game glue: `BotManager` (per-tick driver), `Jobs` (L1 skills),
-  `Commands`, `Game` (helpers over game types).
+- `src/core`: pure logic (jobs, reflex arbitration, the pathfinder search)
+  without game types, tested in `tests/` (the pathfinder on ASCII maps).
+- `src/mod`: game glue: `BotManager` (per-tick driver), `Jobs` and `PathJob`
+  (L1 skills, path execution), `World` (block classification for the
+  pathfinder), `Commands`, `Debug` (`/kr debug` probes), `Game` (helpers).
 - `spike/`: the feasibility probe mod. Throwaway code with its own
   `xmake.lua`.
 - `tools/bds_driver.py`: runs a test server and forwards console commands
