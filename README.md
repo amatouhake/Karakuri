@@ -25,7 +25,7 @@ What exists today:
   server, which shaped the design. Its probe code is in [`spike/`](spike).
 
 Not there yet: a pathfinder that digs and builds (the engine's navigation only
-walks short distances), crafting, furnaces, chests, and the agent interface
+walks, and only up to 16 blocks), crafting, furnaces, chests, and the agent interface
 (MCP).
 
 ## What it aims to be
@@ -45,14 +45,14 @@ The intended users are server operators and their players.
 
 ## Commands
 
-`/karakuri` (alias `/kr`), operator only. Bot names complete in the chat box.
+`/karakuri` (alias `/kr`), operator only. Bot names are registered for command completion (not yet checked in a client).
 
 | Command | What it does |
 |---|---|
 | `kr spawn <name> [pos]` | Spawn a survival bot (at your position when run by a player) |
 | `kr remove <bot>` / `kr list` | Remove a bot / list bots |
 | `kr status <bot>` | Position, health, hunger, current job, last result, inventory |
-| `kr goto <bot> <pos>` | Walk to a position (walking only, for now) |
+| `kr goto <bot> <pos>` | Walk to a position up to 16 blocks away (walking only, for now) |
 | `kr mine <bot> <pos>` | Break a block within reach, with whatever the bot holds |
 | `kr place <bot> <pos>` | Place the held block at a position within reach |
 | `kr hold <bot> <slot>` | Select a hotbar slot (0–8) |

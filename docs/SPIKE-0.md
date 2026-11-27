@@ -4,7 +4,7 @@ Results of step 0 in [DESIGN.md](DESIGN.md) chapter 7. Only what was actually se
 
 - **Date**: 2026-11-28 (two sessions; the second added placing, reach, cancelling and the header checks)
 - **Environment**: LeviLamina 26.60.7 / BDS 1.26.60.6 / Windows 11. A local test server (survival, normal difficulty). No real player ever connected.
-- **Mod**: [`spike/`](../spike), `KarakuriSpike.dll` SHA-256 `73DB8742BA5303114CCACEA66C240A05C2357510C2A3D940D3C79262F2755D6D` for the first session; the second session added a `place` action.
+- **Mod**: [`spike/`](../spike), `KarakuriSpike.dll` SHA-256 `73DB8742BA5303114CCACEA66C240A05C2357510C2A3D940D3C79262F2755D6D` for the first session; `028717638A05403B14469DDB4936DD61E5D0639A2FC79488C632E4920946193B` for the second, which added a `place` action.
 - **Method**: send `kspike <action>` from the server console and read the `[KSPIKE]` lines in the log. The raw log is not kept in the repository.
 
 ## Results
@@ -14,7 +14,7 @@ Results of step 0 in [DESIGN.md](DESIGN.md) chapter 7. Only what was actually se
 | Spawning | Works | `SimulatedPlayer::create(name, pos, dim, rot)`, then `setPlayerGameType(Survival)`. `isSimulated=true`. The xuid changes on every spawn. |
 | Chunks and physics with no player online | Work | Spawned at y=120, the bot fell and landed on the ground (y=67). Nearby blocks could be read. |
 | Fall damage and death | Work | Took damage=50 (cause=5) on landing and died. `PlayerDieEvent` fires. |
-| Respawn | Works, with a catch | `simulateRespawn()` revives the bot with HP and hunger back at 20. The respawn point is the spawn position, so a bot spawned in mid-air falls and dies again on every respawn. Like CFSP, the mod must set `mPlayerRespawnPoint` to a spot on the ground. |
+| Respawn | Works, with a catch | `simulateRespawn()` revives the bot with HP and hunger back at 20. The respawn point is the spawn position, so a bot spawned in mid-air falls and dies again on every respawn. The mod must set the respawn point to a spot on the ground (see "Respawn point" below). |
 | Items on death | Dropped | Items held were gone after respawning. |
 | Targeted by mobs | Works | A zombie summoned at night went for the bot, hit it for 3 damage at a time with knockback, and killed it. |
 | Natural spawning | Happens | With no player online, hostile mobs spawned around the bot at night and attacked it. |
@@ -32,14 +32,14 @@ Results of step 0 in [DESIGN.md](DESIGN.md) chapter 7. Only what was actually se
 | Cancelling | Works | `simulateStopDestroyingBlock` mid-break left the stone in place. `simulateStopMoving` mid-path stopped the bot within about 0.3 blocks. |
 | Respawn point | Settable | `Player::setRespawnPosition(BlockPos, DimensionType)` is `MCAPI`. Set it once the terrain under the bot is loaded; at creation time the chunks may not be. |
 | Containers, crafting, furnaces (headers) | Reachable | Chest and furnace block actors expose `getContainer()` (virtual, so callable). `Recipes::forEachRecipeFor` and `Recipes::getFurnaceRecipeResult` are `MCAPI`. Not exercised yet. |
-| Navigation | Walking only | Built a path to a point 17 blocks away and arrived in about 5 seconds, stepping up one-block ledges. For targets that cannot be reached on foot (a pillar top, an enclosed box) it returns `isFullPath=false` and stops at the closest point. It never digs, pillars up or bridges. A target in the air above water gives a path of length 0. From some start points it found no path to a reachable target, and targets about 16 or more blocks away often fail. |
+| Navigation | Walking only | Built a path to a point about 16 blocks away (straight line) and arrived in about 5 seconds, stepping up one-block ledges. For targets that cannot be reached on foot (a pillar top, an enclosed box) it returns `isFullPath=false` and stops at the closest point. It never digs, pillars up or bridges. A target in the air above water gives a path of length 0. Targets more than 16 blocks away get no path (measured later on flat ground, see VALIDATION.md); on natural terrain some shorter trips also failed from particular start points, cause unknown. |
 
 ## What this means for the design
 
 - The engine already handles basic survival body mechanics (damage, death, regeneration, hunger, eating, sleeping, break times, pickup). The body-related parts of L0 and L1 can be thin wrappers.
 - The mod has to manage respawn points and enforce reach.
 - Containers, crafting and furnaces are all built in the mod by direct manipulation; the needed game functions are reachable.
-- The engine's navigation only walks, and only over short distances. A pathfinder with digging, scaffolding and bridging has to be written, and it is the biggest piece of L1 work (DESIGN.md chapter 7, step 2).
+- The engine's navigation only walks, and only up to 16 blocks. A pathfinder with digging, scaffolding and bridging has to be written, and it is the biggest piece of L1 work (DESIGN.md chapter 7, step 2).
 - Hostile mobs spawn at night even with no player online. An idle bot dies, so L0 reflexes (flee, fight, sleep) are needed early.
 - The HP readable during `ActorHurtEvent` is already after the damage (the spike log labels it `hpBefore`, which is wrong).
 
