@@ -180,14 +180,14 @@ If learned models are added, start with narrow specialist models, not a general 
 
 **Skill persistence**: saving, searching and versioning named scripts; execution logs; a sandbox; time limits.
 
-**External interface**: MCP (or WebSocket).
+**External interface**: MCP, Streamable HTTP with JSON responses, inside the BDS process (decided 2026-11-28: simpler than a sidecar and it reads game state directly).
 
-- Whether the server lives inside the BDS process or in a separate sidecar process is open.
-- Either way, calls are queued and run on the game thread.
-- It listens on localhost only.
-- MCP is request/response, so events pushed by the server may not reach Claude Code. If they do not, a blocking tool such as `wait_for_event` fills the gap; interruptions are then noticed on the next call.
+- Calls that touch the game are queued to the server thread and awaited on the HTTP thread; waiting (`wait_for_event`, `wait_seconds`) never blocks the game.
+- It listens on localhost only and rejects requests whose `Origin` is not local.
+- Tools mirror the commands (spawn, goto, mine, place, eat, attack, collect, stop, status) plus observation (`find_blocks`, `nearby_entities`, `get_block`). Low-level controls are added only when a need shows up.
+- MCP is request/response, so events cannot be pushed to the agent. `wait_for_event` (long polling with a cursor) fills the gap, and job tools accept `wait_seconds` to return the result in one call.
 
-**Script execution**: an agent calling one tool per action is too slow to judge practicality. Provide `run_script`, which runs a short script calling the skill API in one go. This needs an embedded language and a sandbox (Endbot used Luau).
+**Script execution**: an agent calling one tool per action may be too slow. If using the MCP tools shows that it is, provide `run_script`, which runs a short script calling the skill API in one go. This needs an embedded language and a sandbox (Endbot used Luau). Decided 2026-11-28: wait until MCP use shows the need.
 
 ## 7. Scope of the first prototype
 
@@ -206,7 +206,7 @@ If learned models are added, start with narrow specialist models, not a general 
    - **Done**: jobs `goto` (engine navigation), `mine`, `place`, `eat`, `attack`, each cancellable and ending in `done` or a failure reason. Reflexes `fight` (when hurt with a monster near) and `eat` (when hungry) pause the job and resume it afterwards. Job bookkeeping and reflex arbitration are pure headers in `src/core` with unit tests.
    - **Done**: a pathfinder (`src/core/Pathfinder.h`): resumable A* over a block-query interface with walk, step up, drop (up to 3), dig through, bridge, pillar and dig down; no digging next to liquids or under falling blocks; scaffold blocks come from the hotbar. `goto` uses it and executes one step at a time, confirming each step and replanning on mismatch; `mine` and `place` walk within reach first.
    - **Next**: crafting, smelting and chest work by direct manipulation (8.1), weapon choice and a low-health reflex, swimming, and moving `attack`'s chase onto the pathfinder.
-3. Expose this as MCP and use Claude Code itself as the first agent. No LLM inside the mod: the fastest way to see how practical it is.
+3. Expose this as MCP and use Claude Code itself as the first agent. No LLM inside the mod: the fastest way to see how practical it is. **Done** (see "External interface" in 6); `run_script` is postponed until MCP use shows the need.
    - This is a prototype exception: Claude Code (in the L5 role) calls L1 skills directly. The 5.5 rule "L5 does not drive L1 directly" applies once L3 exists.
    - `run_script` and event waiting are built here too.
 4. Manual control through commands with completion. **Started**: `/karakuri` (`/kr`) has typed subcommands and bot-name completion; it grows with the skills.
@@ -260,9 +260,7 @@ Three reasons:
 
 ## 9. Open questions
 
-- Where the MCP server lives (inside the BDS process or a sidecar).
-- The embedded language and sandbox for `run_script` (Luau, JS, Lua, ...).
-- How fine-grained MCP tools should be (how much low-level control to expose).
+- Whether `run_script` is needed, and if so its embedded language and sandbox (Luau, JS, Lua, ...).
 - API keys and cost if the mod calls an LLM itself.
 - Remaining behavioral differences from real players (achievements, statistics, the invisibility-after-death issue seen in CFSP).
 - When Mojang removed symbols from BDS (no primary source found; does not affect the implementation).

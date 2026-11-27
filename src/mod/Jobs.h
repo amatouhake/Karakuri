@@ -44,6 +44,8 @@ std::unique_ptr<Job> makeApproach(BlockPos block, float reach);
 std::unique_ptr<Job> makeMine(BlockPos pos);
 std::unique_ptr<Job> makePlace(BlockPos pos);
 std::unique_ptr<Job> makeEat();
+// Walks over dropped items within `radius` until none are left (or none can be reached).
+std::unique_ptr<Job> makeCollect(float radius = 8.0f);
 // Attacks `target`, or the nearest monster within `radius` when no target is given.
 std::unique_ptr<Job> makeAttack(std::optional<ActorUniqueID> target, float radius = 16.0f);
 

@@ -9,6 +9,41 @@ here; only behavior read from the server log is. Raw logs are not kept in the re
 - No real client connected: everything was driven from the server console with
   [`tools/bds_driver.py`](../tools/bds_driver.py).
 
+## 2026-11-28: MCP server
+
+Build: the commit that adds this section, `Karakuri.dll` SHA-256
+`78b60de79a7446f96557baeb9dfb4bc5c5cf0936ebbca96dd0ba6ca6e58d669a`. Driven with a minimal JSON-RPC client over HTTP (the same requests an MCP client sends).
+
+| Case | Seen |
+|---|---|
+| Start | `MCP server listening on http://127.0.0.1:47821/mcp`; `config/config.json` written with the defaults |
+| `initialize`, `tools/list` | Protocol version `2025-06-18` negotiated; 17 tools listed with input schemas |
+| Observation | `find_blocks` found oak logs 11.4 blocks away; `nearby_entities` listed an item and a sheep; `get_block` classified grass as solid; an unknown bot returned `isError` with `no bot named nobody` |
+| Jobs with `wait_seconds` | `mine` on a log 11 blocks away walked within reach and returned `state: done` in the same call (about 6 s) |
+| Jobs without waiting, then `wait_for_event` | `mine` returned `running` with a job id; `wait_for_event` returned its `job_finished` event; with nothing new it returned an empty list after the timeout |
+| `collect_items` | Picked up dropped oak logs, a sapling, a stick and dirt (inventory checked with `bot_status`) |
+| Shutdown | `stop` on the console shut the server down cleanly with the MCP server running (`Quit correctly`) |
+
+**Agent run (same build).** A headless Claude Code (`claude -p` with this repository's `.mcp.json`,
+only the karakuri tools allowed) was asked to spawn a bot, mine two oak logs, collect the drops and
+report the log count. It called `spawn_bot`, `find_blocks`, `mine` twice and `collect_items` (all
+with `wait_seconds`), then `bot_status`, and reported 2 oak logs; the server log matches (every job
+`done`, no replans). It picked a tree trunk reachable from the ground over a nearer single log.
+Its feedback on the tools:
+
+- `collect_items` and `mine` do not say what was picked up; it needed `bot_status` to find out.
+- `find_blocks` sorts by distance only and does not group logs into trees.
+- Right after `spawn_bot` the bot is still falling into place (`on_ground: false`).
+
+**Follow-up (next commit, `Karakuri.dll` tested: SHA-256 `613403b95988677b9bec03ef112c1f51a9b1e219ee86a315c1bebfa1040a4eaa`;
+the commit only adds a sentence to the `mine` tool description).** Job results and `job_finished`
+events now carry `inventory_change`. Seen over MCP: `collect_items` returned
+`{"minecraft:oak_log": 1}` and its detail `inventory +1 oak_log`; `mine` returned an empty change
+because the drop was still on the ground, which its description now says.
+
+While collecting items in an earlier run, the bot dug through blocks to reach drops (the pathfinder
+may break blocks on the way).
+
 ## 2026-11-28: pathfinder
 
 Build: `8d00003`, `Karakuri.dll` SHA-256 `c339582e87c820ed8d8605cf7041a921e458ee2af549a485d97d985ea91d64c8`.

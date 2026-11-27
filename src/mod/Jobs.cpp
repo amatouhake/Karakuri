@@ -11,6 +11,11 @@
 #include "mc/world/level/BlockSource.h"
 #include "mc/world/level/Level.h"
 #include "mc/world/level/block/Block.h"
+#include "mc/world/phys/AABB.h"
+
+#include <algorithm>
+#include <cmath>
+#include <vector>
 
 namespace karakuri {
 
@@ -169,6 +174,70 @@ private:
     int   mCount{0};
 };
 
+class CollectJob final : public Job {
+public:
+    explicit CollectJob(float radius) : mRadius(radius) {}
+
+    std::string describe() const override { return fmt::format("collect items within {:.0f}", mRadius); }
+
+    void pause(SimulatedPlayer& sp) override {
+        Job::pause(sp);
+        if (mWalk) mWalk->pause(sp);
+    }
+
+    JobStep step(SimulatedPlayer& sp) override {
+        if (++mTicks > 20 * 90) return JobStep::fail(fmt::format("timed out after {} items", mPicked));
+        if (mWalk) {
+            auto r = mWalk->step(sp);
+            if (!r.finished()) return JobStep::running();
+            mWalk.reset();
+            if (r.state == JobState::Failed) mSkipped.push_back(mTarget); // unreachable: try others
+            mSettle = 10; // give the pickup a moment
+            return JobStep::running();
+        }
+        if (mSettle > 0) {
+            --mSettle;
+            return JobStep::running();
+        }
+        auto* item = nearestItem(sp);
+        if (!item) {
+            sp.simulateStopMoving();
+            return JobStep::done(fmt::format("{} item stacks left behind", mSkipped.size()));
+        }
+        ++mPicked;
+        mTarget  = item->getOrCreateUniqueID();
+        auto f   = item->getPosition();
+        mWalk    = makePathGoto(BlockPos{(int)std::floor(f.x), (int)std::floor(f.y + 0.1f), (int)std::floor(f.z)}, 1.0f);
+        return JobStep::running();
+    }
+
+private:
+    Actor* nearestItem(SimulatedPlayer& sp) {
+        auto  c = sp.getPosition();
+        AABB  box{c - Vec3{mRadius, mRadius, mRadius}, c + Vec3{mRadius, mRadius, mRadius}};
+        Actor* best  = nullptr;
+        float  bestD = mRadius;
+        for (auto* a : sp.getDimensionBlockSource().getEntities(box, 0.0f)) {
+            if (!a || a->getTypeName() != "minecraft:item") continue;
+            auto id = a->getOrCreateUniqueID();
+            if (std::find(mSkipped.begin(), mSkipped.end(), id) != mSkipped.end()) continue;
+            float d = a->getPosition().distanceTo(c);
+            if (d <= bestD) {
+                bestD = d;
+                best  = a;
+            }
+        }
+        return best;
+    }
+
+    float                      mRadius;
+    int                        mPicked{0};
+    int                        mSettle{0};
+    ActorUniqueID              mTarget{};
+    std::vector<ActorUniqueID> mSkipped;
+    std::unique_ptr<Job>       mWalk;
+};
+
 class AttackJob final : public Job {
 public:
     AttackJob(std::optional<ActorUniqueID> target, float radius) : mTarget(target), mRadius(radius) {}
@@ -226,6 +295,7 @@ private:
 std::unique_ptr<Job> makeMine(BlockPos pos) { return std::make_unique<MineJob>(pos); }
 std::unique_ptr<Job> makePlace(BlockPos pos) { return std::make_unique<PlaceJob>(pos); }
 std::unique_ptr<Job> makeEat() { return std::make_unique<EatJob>(); }
+std::unique_ptr<Job> makeCollect(float radius) { return std::make_unique<CollectJob>(radius); }
 std::unique_ptr<Job> makeAttack(std::optional<ActorUniqueID> target, float radius) {
     return std::make_unique<AttackJob>(target, radius);
 }

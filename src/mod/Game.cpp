@@ -92,6 +92,16 @@ std::string inventorySummary(Player const& p) {
     return out.empty() ? "(empty)" : out;
 }
 
+ItemCounts inventoryCounts(Player const& p) {
+    ItemCounts out;
+    auto&      inv = p.getInventory();
+    for (int i = 0; i < inv.getContainerSize(); ++i) {
+        auto const& it = inv.getItem(i);
+        if (!it.isNull()) out[it.getTypeName()] += it.mCount;
+    }
+    return out;
+}
+
 std::string describe(SimulatedPlayer& sp) {
     auto pos = sp.getFeetPos();
     return fmt::format(

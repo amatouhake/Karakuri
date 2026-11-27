@@ -4,6 +4,7 @@
 #include "mod/Mod.h"
 
 #include "mod/BotManager.h"
+#include "mod/Mcp.h"
 
 #include "ll/api/event/EventBus.h"
 #include "ll/api/event/entity/ActorHurtEvent.h"
@@ -45,10 +46,12 @@ bool Mod::enable() {
     gListeners.push_back(bus.emplaceListener<ll::event::PlayerDieEvent>([&bots](ll::event::PlayerDieEvent& ev) {
         if (ev.self().isSimulated()) bots.onDeath(static_cast<SimulatedPlayer&>(ev.self()));
     }));
+    mcp::start(mcp::loadConfig(getSelf().getConfigDir()));
     return true;
 }
 
 bool Mod::disable() {
+    mcp::stop();
     auto& bus = ll::event::EventBus::getInstance();
     for (auto& l : gListeners) bus.removeListener(l);
     gListeners.clear();

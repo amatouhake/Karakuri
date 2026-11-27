@@ -7,6 +7,8 @@
 #include "mc/scripting/modules/minecraft/ScriptFacing.h"
 #include "mc/world/level/BlockPos.h"
 
+#include "core/Inventory.h"
+
 #include <string>
 
 class Actor;
@@ -37,5 +39,6 @@ bool withinReach(Player const& p, Vec3 const& target, float reach = kReach);
 
 std::string describe(SimulatedPlayer& sp);
 std::string inventorySummary(Player const& p);
+ItemCounts  inventoryCounts(Player const& p);
 
 } // namespace karakuri
