@@ -31,6 +31,7 @@ struct Bot {
     int64_t              respawnAt{-1};
     int64_t              reflexRetryAt{0};
     bool                 respawnPointSet{false};
+    int                  traceEvery{0}; // debug: log position every N ticks
 };
 
 class BotManager {
@@ -48,6 +49,8 @@ public:
     std::string hold(std::string const& name, int slot);
     std::string setReflexes(std::string const& name, bool on);
     std::vector<std::string> names() const;
+    std::string              setTrace(std::string const& name, int every);
+    SimulatedPlayer*         player(std::string const& name);
 
     void tick(Level& level);
     void onHurt(SimulatedPlayer& sp);

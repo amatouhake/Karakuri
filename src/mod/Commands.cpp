@@ -145,6 +145,7 @@ void registerCommands() {
             reply(out, bots.assign(p.bot, makeAttack(std::nullopt)), "attack started");
         }
     );
+    registerDebugCommands(cmd);
 }
 
 } // namespace karakuri

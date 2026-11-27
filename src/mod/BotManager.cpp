@@ -123,6 +123,18 @@ std::string BotManager::hold(std::string const& name, int slot) {
     return {};
 }
 
+std::string BotManager::setTrace(std::string const& name, int every) {
+    auto* bot = find(name);
+    if (!bot) return fmt::format("no bot named {}", name);
+    bot->traceEvery = every;
+    return {};
+}
+
+SimulatedPlayer* BotManager::player(std::string const& name) {
+    auto* bot = find(name);
+    return bot ? resolve(*bot) : nullptr;
+}
+
 std::string BotManager::setReflexes(std::string const& name, bool on) {
     auto* bot = find(name);
     if (!bot) return fmt::format("no bot named {}", name);
@@ -207,6 +219,14 @@ void BotManager::tick(Level&) {
 }
 
 void BotManager::tickBot(Bot& bot, SimulatedPlayer& sp) {
+    if (bot.traceEvery > 0 && mTick % bot.traceEvery == 0) {
+        auto f = sp.getFeetPos();
+        auto d = sp.getPosDelta();
+        logger().info(
+            "[trace] {} pos=({:.2f},{:.2f},{:.2f}) delta=({:.2f},{:.2f},{:.2f}) onGround={} sneaking={}",
+            bot.name, f.x, f.y, f.z, d.x, d.y, d.z, sp.isOnGround(), sp.isSneaking()
+        );
+    }
     if (!sp.isAlive()) {
         // Keep trying until the bot is back, also after a death the event listener missed.
         if (bot.respawnAt < 0) bot.respawnAt = mTick + kRespawnDelay;

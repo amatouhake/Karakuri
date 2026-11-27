@@ -27,4 +27,9 @@ inline ll::io::Logger& logger() { return Mod::getInstance().getSelf().getLogger(
 enum class BotName : int {};
 void registerCommands();
 
+}
+namespace ll::command { class CommandHandle; }
+namespace karakuri {
+void registerDebugCommands(ll::command::CommandHandle& cmd);
+
 } // namespace karakuri
