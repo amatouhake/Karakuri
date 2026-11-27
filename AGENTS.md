@@ -10,8 +10,16 @@ agents. This file is the working manual for coding agents.
   questions. Read it before proposing structure.
 - [docs/SPIKE-0.md](docs/SPIKE-0.md): what `SimulatedPlayer` was seen to do
   on a live server.
-- `spike/`: the feasibility probe mod. Throwaway code; the real mod will be
-  a separate target.
+- [docs/VALIDATION.md](docs/VALIDATION.md): what the mod was seen to do, per
+  build. A server result goes there with the DLL hash.
+- `src/core`: pure logic (jobs, reflex arbitration) without game types,
+  tested in `tests/`.
+- `src/mod`: game glue: `BotManager` (per-tick driver), `Jobs` (L1 skills),
+  `Commands`, `Game` (helpers over game types).
+- `spike/`: the feasibility probe mod. Throwaway code with its own
+  `xmake.lua`.
+- `tools/bds_driver.py`: runs a test server and forwards console commands
+  from a file.
 - Machine-specific paths: `AGENTS.local.md` if present (gitignored; never
   copy it into tracked files).
 
@@ -29,10 +37,16 @@ agents. This file is the working manual for coding agents.
 
 ```powershell
 $env:PATH = "C:\Program Files\LLVM\bin;$env:PATH"   # LLVM 22 is required
-cd spike
 xmake f -p windows -a x64 -m release -y
-xmake build KarakuriSpike
+xmake build Karakuri                                 # -> bin/Karakuri/
+xmake build KarakuriTests; xmake run KarakuriTests   # must print "all tests passed"
 ```
+
+- Put logic that can be a pure function in `src/core` with a test first.
+- Never keep `SimulatedPlayer*` or other game pointers across ticks; keep
+  names, ids or positions and resolve them each tick.
+- Confirm a skill's result from world state; some `simulate*` calls report
+  success when nothing happened.
 
 - Game types are in the SDK headers in the xmake package cache
   (`%LOCALAPPDATA%/.xmake/packages/l/levilamina/<version>/*/include/mc/`).

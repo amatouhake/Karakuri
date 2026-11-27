@@ -1,7 +1,7 @@
 # Karakuri design notes (draft)
 
 - Started: 2026-11-27
-- Status: design stage. Only a feasibility spike exists (`spike/`, results in [SPIKE-0.md](SPIKE-0.md)).
+- Status: early prototype. The feasibility spike is done ([SPIKE-0.md](SPIKE-0.md)); the mod has a bot manager, the first L1 skills and two L0 reflexes ([VALIDATION.md](VALIDATION.md)).
 
 ## 1. In one sentence
 
@@ -71,7 +71,9 @@ LeviLamina exposes BDS's `SimulatedPlayer` (derived from `ServerPlayer`).
 - Confirmed in a live run (2026-11-28, [SPIKE-0.md](SPIKE-0.md)):
   - Taking damage, death, regeneration, hunger, eating, sleeping, item pickup and tool-dependent break times all behave as in survival.
   - The respawn point is the spawn position, so the mod must manage it.
-  - `simulateNavigateToLocation` only walks. It does not dig, pillar up or bridge.
+  - Reach is not enforced for simulated players, so skills enforce it (8.1).
+  - Some `simulate*` calls report success when nothing happened, so skills confirm results in the world.
+  - `simulateNavigateToLocation` only walks, and often finds no path beyond about 16 blocks. It does not dig, pillar up or bridge.
 - No systematic list of behavioral differences from real players (achievements and so on) has been found.
 
 **Existing implementation worth studying**: [CoralFans-Dev/CFSP](https://github.com/CoralFans-Dev/CFSP) (AGPL-3.0, supports 26.60.*, maintained)
@@ -199,13 +201,15 @@ If learned models are added, start with narrow specialist models, not a general 
    - Whether `simulateNavigateToLocation` can dig, pillar up or bridge.
 
    These results decide how much of chapter 5 can be built.
-1. A base that creates and drives `SimulatedPlayer` on LeviLamina, informed by CFSP's workarounds.
+1. A base that creates and drives `SimulatedPlayer` on LeviLamina. **Done**: `BotManager` spawns and removes named bots, pins respawn points, respawns dead bots, and runs one per-tick driver (observe → L0 → job step). Game pointers are never kept across ticks.
 2. L0 reflexes and the basic L1 skills (move, mine, place, craft, eat, chest work).
-   - The engine's navigation only walks (spike 0), so a Baritone-class pathfinder with digging and scaffolding is the biggest piece of L1 work.
+   - **Done**: jobs `goto` (engine navigation), `mine`, `place`, `eat`, `attack`, each cancellable and ending in `done` or a failure reason. Reflexes `fight` (when hurt with a monster near) and `eat` (when hungry) pause the job and resume it afterwards. Job bookkeeping and reflex arbitration are pure headers in `src/core` with unit tests.
+   - **Next**: a pathfinder with digging, scaffolding and bridging (the engine's navigation only walks short distances), then crafting, smelting and chest work by direct manipulation (8.1), and a low-health reflex.
+   - The pathfinder is pure A* over a block-query interface, with tests, and is the biggest piece of L1 work.
 3. Expose this as MCP and use Claude Code itself as the first agent. No LLM inside the mod: the fastest way to see how practical it is.
    - This is a prototype exception: Claude Code (in the L5 role) calls L1 skills directly. The 5.5 rule "L5 does not drive L1 directly" applies once L3 exists.
    - `run_script` and event waiting are built here too.
-4. Manual control through commands with completion.
+4. Manual control through commands with completion. **Started**: `/karakuri` (`/kr`) has typed subcommands and bot-name completion; it grows with the skills.
 
 **Added afterwards**
 
