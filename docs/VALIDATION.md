@@ -24,9 +24,19 @@ Build: the commit that adds this section, `Karakuri.dll` SHA-256
 | `collect_items` | Picked up dropped oak logs, a sapling, a stick and dirt (inventory checked with `bot_status`) |
 | Shutdown | `stop` on the console shut the server down cleanly with the MCP server running (`Quit correctly`) |
 
-Not checked: an AI agent driving the bots end to end. A headless `claude -p` run with this
-repository's `.mcp.json` could not start because its login had expired. While collecting items,
-the bot dug through blocks to reach drops (the pathfinder may break blocks on the way).
+**Agent run (same build).** A headless Claude Code (`claude -p` with this repository's `.mcp.json`,
+only the karakuri tools allowed) was asked to spawn a bot, mine two oak logs, collect the drops and
+report the log count. It called `spawn_bot`, `find_blocks`, `mine` twice and `collect_items` (all
+with `wait_seconds`), then `bot_status`, and reported 2 oak logs; the server log matches (every job
+`done`, no replans). It picked a tree trunk reachable from the ground over a nearer single log.
+Its feedback on the tools:
+
+- `collect_items` and `mine` do not say what was picked up; it needed `bot_status` to find out.
+- `find_blocks` sorts by distance only and does not group logs into trees.
+- Right after `spawn_bot` the bot is still falling into place (`on_ground: false`).
+
+While collecting items in an earlier run, the bot dug through blocks to reach drops (the pathfinder
+may break blocks on the way).
 
 ## 2026-11-28: pathfinder
 
