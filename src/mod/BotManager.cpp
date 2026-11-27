@@ -38,6 +38,24 @@ SimulatedPlayer* BotManager::resolve(Bot const& bot) const {
     return p && p->isSimulated() ? static_cast<SimulatedPlayer*>(p) : nullptr;
 }
 
+void BotManager::emit(Bot const& bot, std::string kind, std::string detail, uint64_t jobId, std::string state) {
+    mEvents.push({0, mTick, bot.name, std::move(kind), jobId, std::move(state), std::move(detail)});
+}
+
+std::optional<BotManager::Info> BotManager::info(std::string const& name) {
+    auto* bot = find(name);
+    if (!bot) return std::nullopt;
+    Info i;
+    i.name            = bot->name;
+    i.player          = resolve(*bot);
+    i.job             = bot->job ? bot->job->describe() : "";
+    i.jobId           = bot->job ? bot->jobId : 0;
+    i.reflex          = toString(bot->arbiter.current());
+    i.reflexesEnabled = bot->reflexesEnabled;
+    i.lastResult      = bot->lastResult;
+    return i;
+}
+
 std::vector<std::string> BotManager::names() const {
     std::vector<std::string> out;
     for (auto const& [name, _] : mBots) out.push_back(name);
@@ -66,6 +84,7 @@ std::string BotManager::spawn(std::string const& name, Vec3 pos, int dimension) 
     bot.name  = name;
     publishNames();
     logger().info("{} spawned: {}", name, describe(*sp));
+    emit(bot, "spawned", describe(*sp));
     return {};
 }
 
@@ -73,6 +92,8 @@ std::string BotManager::remove(std::string const& name) {
     auto* bot = find(name);
     if (!bot) return fmt::format("no bot named {}", name);
     if (auto* sp = resolve(*bot)) sp->simulateDisconnect();
+    if (bot->job) emit(*bot, "job_finished", bot->job->describe() + ": bot removed", bot->jobId, "cancelled");
+    emit(*bot, "removed", "");
     mBots.erase(name);
     publishNames();
     logger().info("{} removed", name);
@@ -86,7 +107,7 @@ void BotManager::removeAll() {
     mBots.clear();
 }
 
-std::string BotManager::assign(std::string const& name, std::unique_ptr<Job> job) {
+std::string BotManager::assign(std::string const& name, std::unique_ptr<Job> job, uint64_t* jobId) {
     auto* bot = find(name);
     if (!bot) return fmt::format("no bot named {}", name);
     auto* sp = resolve(*bot);
@@ -94,8 +115,12 @@ std::string BotManager::assign(std::string const& name, std::unique_ptr<Job> job
     if (bot->job) {
         bot->job->cancel(*sp);
         logger().info("{} job {} cancelled: replaced", name, bot->job->describe());
+        emit(*bot, "job_finished", bot->job->describe() + ": replaced", bot->jobId, "cancelled");
     }
+    bot->jobId = mNextJobId++;
+    if (jobId) *jobId = bot->jobId;
     logger().info("{} job {} started", name, job->describe());
+    emit(*bot, "job_started", job->describe(), bot->jobId);
     bot->job = std::move(job);
     return {};
 }
@@ -106,7 +131,10 @@ std::string BotManager::stop(std::string const& name) {
     auto* sp = resolve(*bot);
     if (sp && bot->job) bot->job->cancel(*sp);
     if (sp && bot->reflex) bot->reflex->cancel(*sp);
-    if (bot->job) bot->lastResult = fmt::format("{}: cancelled", bot->job->describe());
+    if (bot->job) {
+        bot->lastResult = fmt::format("{}: cancelled", bot->job->describe());
+        emit(*bot, "job_finished", bot->job->describe() + ": stopped", bot->jobId, "cancelled");
+    }
     bot->job.reset();
     bot->reflex.reset();
     bot->arbiter.reset();
@@ -164,7 +192,13 @@ std::string BotManager::status(std::string const& name) {
 }
 
 void BotManager::onHurt(SimulatedPlayer& sp) {
-    if (auto* bot = find(sp.getRealName())) bot->lastHurtTick = mTick;
+    auto* bot = find(sp.getRealName());
+    if (!bot) return;
+    bot->lastHurtTick = mTick;
+    if (mTick - bot->lastHurtEventTick >= 20) { // at most one hurt event per second
+        bot->lastHurtEventTick = mTick;
+        emit(*bot, "hurt", fmt::format("hp {}", sp.getHealth()));
+    }
 }
 
 void BotManager::onDeath(SimulatedPlayer& sp) {
@@ -174,6 +208,7 @@ void BotManager::onDeath(SimulatedPlayer& sp) {
         bot->job->cancel(sp);
         bot->lastResult = fmt::format("{}: failed (died)", bot->job->describe());
         logger().info("{} job {} failed: died", bot->name, bot->job->describe());
+        emit(*bot, "job_finished", bot->job->describe() + ": died", bot->jobId, "failed");
     }
     bot->job.reset();
     bot->reflex.reset();
@@ -192,6 +227,7 @@ void BotManager::onDeath(SimulatedPlayer& sp) {
     }
     bot->respawnAt = mTick + kRespawnDelay;
     logger().info("{} died: {}", bot->name, describe(sp));
+    emit(*bot, "died", describe(sp));
 }
 
 void BotManager::finishJob(Bot& bot, std::unique_ptr<Job>& slot, JobStep const& r, char const* kind) {
@@ -205,7 +241,10 @@ void BotManager::finishJob(Bot& bot, std::unique_ptr<Job>& slot, JobStep const& 
         r.reason.empty() ? "" : ": ",
         r.reason
     );
-    if (&slot == &bot.job) bot.lastResult = fmt::format("{}: {}{}{}", what, toString(r.state), r.reason.empty() ? "" : " (", r.reason.empty() ? "" : r.reason + ")");
+    if (&slot == &bot.job) {
+        bot.lastResult = fmt::format("{}: {}{}", what, toString(r.state), r.reason.empty() ? "" : " (" + r.reason + ")");
+        emit(bot, "job_finished", r.reason.empty() ? what : what + ": " + r.reason, bot.jobId, toString(r.state));
+    }
     slot.reset();
 }
 
@@ -239,6 +278,7 @@ void BotManager::tickBot(Bot& bot, SimulatedPlayer& sp) {
     if (bot.respawnAt >= 0) {
         bot.respawnAt = -1;
         logger().info("{} respawned: {}", bot.name, describe(sp));
+        emit(bot, "respawned", describe(sp));
     }
 
     // The respawn point defaults to the spawn position, so a bot spawned in mid-air would fall to
@@ -271,6 +311,7 @@ void BotManager::tickBot(Bot& bot, SimulatedPlayer& sp) {
                 if (bot.job) bot.job->pause(sp);
                 bot.reflex = now == Reflex::Fight ? makeAttack(std::nullopt, kThreatRadius) : makeEat();
             }
+            emit(bot, "reflex", fmt::format("{} -> {}", toString(before), toString(now)));
             logger().info(
                 "{} reflex {} -> {} (hp {:.0f}, hunger {:.0f}, threat {}, hurt {} ticks ago)",
                 bot.name,

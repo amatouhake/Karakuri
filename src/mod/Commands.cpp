@@ -140,6 +140,11 @@ void registerCommands() {
             reply(out, bots.assign(p.bot, makeEat()), "eat started");
         }
     );
+    cmd.overload<OneBot>().text("collect").required("bot").execute(
+        [&bots](CommandOrigin const&, CommandOutput& out, OneBot const& p) {
+            reply(out, bots.assign(p.bot, makeCollect()), "collect started");
+        }
+    );
     cmd.overload<OneBot>().text("attack").required("bot").execute(
         [&bots](CommandOrigin const&, CommandOutput& out, OneBot const& p) {
             reply(out, bots.assign(p.bot, makeAttack(std::nullopt)), "attack started");

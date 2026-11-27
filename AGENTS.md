@@ -16,7 +16,9 @@ agents. This file is the working manual for coding agents.
   without game types, tested in `tests/` (the pathfinder on ASCII maps).
 - `src/mod`: game glue: `BotManager` (per-tick driver), `Jobs` and `PathJob`
   (L1 skills, path execution), `World` (block classification for the
-  pathfinder), `Commands`, `Debug` (`/kr debug` probes), `Game` (helpers).
+  pathfinder), `Commands`, `Debug` (`/kr debug` probes), `Mcp` (the MCP
+  server and its tools), `Game` (helpers).
+- `src/core/Events.h`: the thread-safe event log that `wait_for_event` reads.
 - `spike/`: the feasibility probe mod. Throwaway code with its own
   `xmake.lua`.
 - `tools/bds_driver.py`: runs a test server and forwards console commands

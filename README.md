@@ -26,8 +26,11 @@ What exists today:
 - [Spike 0](docs/SPIKE-0.md): what BDS's `SimulatedPlayer` does on a live
   server, which shaped the design. Its probe code is in [`spike/`](spike).
 
-Not there yet: crafting, furnaces, chests, swimming, and the agent interface
-(MCP).
+- An MCP server inside the mod, so AI agents such as Claude Code can drive the
+  bots (see [Agents (MCP)](#agents-mcp)).
+
+Not there yet: crafting, furnaces, chests, swimming, and running scripts in
+one call (`run_script`).
 
 ## What it aims to be
 
@@ -59,12 +62,38 @@ The intended users are server operators and their players.
 | `kr hold <bot> <slot>` | Select a hotbar slot (0–8) |
 | `kr eat <bot>` | Eat food from the hotbar |
 | `kr attack <bot>` | Attack the nearest monster |
+| `kr collect <bot>` | Walk over dropped items nearby to pick them up |
 | `kr stop <bot>` | Cancel the current job |
 | `kr reflexes <bot> on\|off` | Turn the automatic fight and eat reflexes on or off |
 | `kr debug ...` | Developer probes (block classification, movement primitives) |
 
 Jobs run in the background; their results go to the server log and to
 `kr status`. A dead bot respawns on its own after one second.
+
+## Agents (MCP)
+
+The mod runs an MCP server (Streamable HTTP) on `http://127.0.0.1:47821/mcp`,
+reachable from the same machine only. Change the address or turn it off in
+`mods/Karakuri/config/config.json`, which is created on first start:
+
+```json
+{ "mcp": { "enabled": true, "host": "127.0.0.1", "port": 47821 } }
+```
+
+This repository's [`.mcp.json`](.mcp.json) points Claude Code at it; from
+another folder:
+
+```powershell
+claude mcp add --transport http karakuri http://127.0.0.1:47821/mcp
+```
+
+Tools: `list_bots`, `spawn_bot`, `remove_bot`, `bot_status`, `goto`, `mine`,
+`place`, `hold`, `eat`, `attack`, `collect_items`, `stop`, `set_reflexes`,
+`find_blocks`, `nearby_entities`, `get_block`, `wait_for_event`.
+
+Jobs run in the background. Pass `wait_seconds` to a job tool to get its
+result in the same call, or use `wait_for_event` with the returned
+`event_cursor` to hear about job results, reflexes, damage and deaths.
 
 ## Platform
 

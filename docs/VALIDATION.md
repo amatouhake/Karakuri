@@ -9,6 +9,25 @@ here; only behavior read from the server log is. Raw logs are not kept in the re
 - No real client connected: everything was driven from the server console with
   [`tools/bds_driver.py`](../tools/bds_driver.py).
 
+## 2026-11-28: MCP server
+
+Build: the commit that adds this section, `Karakuri.dll` SHA-256
+`78b60de79a7446f96557baeb9dfb4bc5c5cf0936ebbca96dd0ba6ca6e58d669a`. Driven with a minimal JSON-RPC client over HTTP (the same requests an MCP client sends).
+
+| Case | Seen |
+|---|---|
+| Start | `MCP server listening on http://127.0.0.1:47821/mcp`; `config/config.json` written with the defaults |
+| `initialize`, `tools/list` | Protocol version `2025-06-18` negotiated; 17 tools listed with input schemas |
+| Observation | `find_blocks` found oak logs 11.4 blocks away; `nearby_entities` listed an item and a sheep; `get_block` classified grass as solid; an unknown bot returned `isError` with `no bot named nobody` |
+| Jobs with `wait_seconds` | `mine` on a log 11 blocks away walked within reach and returned `state: done` in the same call (about 6 s) |
+| Jobs without waiting, then `wait_for_event` | `mine` returned `running` with a job id; `wait_for_event` returned its `job_finished` event; with nothing new it returned an empty list after the timeout |
+| `collect_items` | Picked up dropped oak logs, a sapling, a stick and dirt (inventory checked with `bot_status`) |
+| Shutdown | `stop` on the console shut the server down cleanly with the MCP server running (`Quit correctly`) |
+
+Not checked: an AI agent driving the bots end to end. A headless `claude -p` run with this
+repository's `.mcp.json` could not start because its login had expired. While collecting items,
+the bot dug through blocks to reach drops (the pathfinder may break blocks on the way).
+
 ## 2026-11-28: pathfinder
 
 Build: `8d00003`, `Karakuri.dll` SHA-256 `c339582e87c820ed8d8605cf7041a921e458ee2af549a485d97d985ea91d64c8`.

@@ -1,5 +1,6 @@
 // Unit tests for the pure core (no game types). Run: xmake build KarakuriTests && xmake run KarakuriTests
 
+#include "core/Events.h"
 #include "core/Job.h"
 #include "core/Reflex.h"
 
@@ -82,6 +83,24 @@ void reflexFight() {
     check(a.choose(s) == Reflex::Fight, "fighting wins over eating");
 }
 
+void events() {
+    EventLog log(3);
+    log.push({.bot = "a", .kind = "job_started", .jobId = 1});
+    log.push({.bot = "b", .kind = "hurt"});
+    auto id3 = log.push({.bot = "a", .kind = "job_finished", .jobId = 1, .state = "done"});
+    check(id3 == 3 && log.lastId() == 3, "event ids count up");
+    auto onlyA = log.since(0, [](Event const& e) { return e.bot == "a"; });
+    check(onlyA.size() == 2 && onlyA[1].state == "done", "filter by bot");
+    log.push({.bot = "c", .kind = "died"});
+    check(log.since(0).size() == 3 && log.since(0).front().id == 2, "capacity drops the oldest");
+    auto none = log.wait(4, std::chrono::milliseconds(10));
+    check(none.empty(), "wait times out with nothing new");
+    auto got = log.wait(3, std::chrono::milliseconds(10));
+    check(got.size() == 1 && got[0].kind == "died", "wait returns what is already there");
+    log.shutdown();
+    check(log.wait(4, std::chrono::seconds(5)).empty(), "shutdown wakes waiters");
+}
+
 void reach() {
     check(withinReach(0, 0, 0, 3, 4, 0, 5), "distance 5 is within reach 5");
     check(!withinReach(0, 0, 0, 3, 4, 0.1f, 5), "just over reach is out");
@@ -95,6 +114,7 @@ int main() {
     reflexEat();
     reflexFight();
     reach();
+    events();
     pathfinderTests();
     if (gFailures == 0) std::printf("all tests passed\n");
     return gFailures == 0 ? 0 : 1;
