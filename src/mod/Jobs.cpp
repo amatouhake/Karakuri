@@ -25,47 +25,21 @@ namespace {
 
 Vec3 center(BlockPos const& p) { return {p.x + 0.5f, p.y + 0.5f, p.z + 0.5f}; }
 
-// Walks with the engine's navigation. It only walks: no digging, pillaring or bridging
-// (docs/SPIKE-0.md), and it sometimes finds no path to reachable targets.
-class GotoJob final : public Job {
-public:
-    GotoJob(Vec3 target, float tolerance) : mTarget(target), mTolerance(tolerance) {}
-
-    std::string describe() const override {
-        return fmt::format("goto ({:.1f},{:.1f},{:.1f})", mTarget.x, mTarget.y, mTarget.z);
+// Walks within reach of `pos` first when needed. Returns a step to hand back while approaching
+// (or its failure), or nothing once the block is within reach.
+std::optional<JobStep> approach(SimulatedPlayer& sp, std::unique_ptr<Job>& job, BlockPos const& pos) {
+    if (withinReach(sp, center(pos))) {
+        job.reset();
+        return std::nullopt;
     }
-
-    JobStep step(SimulatedPlayer& sp) override {
-        float dist = sp.getFeetPos().distanceTo(mTarget);
-        if (dist <= mTolerance) {
-            sp.simulateStopMoving();
-            return JobStep::done();
-        }
-        if (!mStarted) {
-            auto res = sp.simulateNavigateToLocation(mTarget, 1.0f);
-            if (res.mPath->empty()) return JobStep::fail("no path to target");
-            mPartial = !res.mIsFullPath;
-            mStarted = true;
-            mWatch.reset(dist);
-        }
-        if (++mTicks > mMaxTicks) return JobStep::fail("timed out");
-        if (mWatch.update(dist)) {
-            sp.simulateStopMoving();
-            return JobStep::fail(
-                mPartial ? fmt::format("target unreachable on foot; stopped {:.1f} blocks away", dist)
-                         : fmt::format("stuck {:.1f} blocks away", dist)
-            );
-        }
-        return JobStep::running();
-    }
-
-private:
-    Vec3          mTarget;
-    float         mTolerance;
-    bool          mPartial{false};
-    int           mMaxTicks{20 * 120};
-    ProgressWatch mWatch{40, 0.3};
-};
+    if (!job) job = makeApproach(pos, kReach - 1.0f);
+    auto r = job->step(sp);
+    if (!r.finished()) return JobStep::running();
+    job.reset();
+    if (r.state == JobState::Failed) return JobStep::fail("could not get within reach: " + r.reason);
+    if (!withinReach(sp, center(pos))) return JobStep::fail("still out of reach after approaching");
+    return std::nullopt;
+}
 
 class MineJob final : public Job {
 public:
@@ -73,11 +47,16 @@ public:
 
     std::string describe() const override { return fmt::format("mine ({},{},{})", mPos.x, mPos.y, mPos.z); }
 
+    void pause(SimulatedPlayer& sp) override {
+        Job::pause(sp);
+        if (mApproach) mApproach->pause(sp);
+    }
+
     JobStep step(SimulatedPlayer& sp) override {
         auto& region = sp.getDimensionBlockSource();
         if (!mStarted) {
             if (isAir(region, mPos)) return mBlock.empty() ? JobStep::fail("block is air") : JobStep::done();
-            if (!withinReach(sp, center(mPos))) return JobStep::fail("out of reach");
+            if (auto r = approach(sp, mApproach, mPos); r) return *r;
             mBlock = blockName(region, mPos);
             sp.simulateLookAt(center(mPos), sim::LookDuration::Instant);
             if (!sp.simulateDestroyBlock(mPos, faceToward(mPos, sp.getEyePos())))
@@ -99,8 +78,9 @@ public:
     }
 
 private:
-    BlockPos    mPos;
-    std::string mBlock;
+    BlockPos             mPos;
+    std::string          mBlock;
+    std::unique_ptr<Job> mApproach;
 };
 
 class PlaceJob final : public Job {
@@ -118,7 +98,7 @@ public:
         }
         if (sp.getSelectedItem().isNull()) return JobStep::fail("nothing in hand");
         if (!isAir(region, mPos)) return JobStep::fail(fmt::format("occupied by {}", blockName(region, mPos)));
-        if (!withinReach(sp, center(mPos))) return JobStep::fail("out of reach");
+        if (auto r = approach(sp, mApproach, mPos); r) return *r;
 
         // Click a solid neighbor on the face that points at the target.
         using F = ScriptModuleMinecraft::ScriptFacing;
@@ -146,9 +126,15 @@ public:
         return JobStep::fail("no solid block next to the target to place against");
     }
 
+    void pause(SimulatedPlayer& sp) override {
+        Job::pause(sp);
+        if (mApproach) mApproach->pause(sp);
+    }
+
 private:
-    BlockPos mPos;
-    bool     mClicked{false};
+    BlockPos             mPos;
+    bool                 mClicked{false};
+    std::unique_ptr<Job> mApproach;
 };
 
 class EatJob final : public Job {
@@ -237,7 +223,6 @@ private:
 
 } // namespace
 
-std::unique_ptr<Job> makeGoto(Vec3 target, float tolerance) { return std::make_unique<GotoJob>(target, tolerance); }
 std::unique_ptr<Job> makeMine(BlockPos pos) { return std::make_unique<MineJob>(pos); }
 std::unique_ptr<Job> makePlace(BlockPos pos) { return std::make_unique<PlaceJob>(pos); }
 std::unique_ptr<Job> makeEat() { return std::make_unique<EatJob>(); }

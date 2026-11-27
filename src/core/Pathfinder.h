@@ -138,6 +138,10 @@ private:
     int                                    mMaxNodes{40000};
 };
 
+// Distance used by the goal test (from the feet cell, or from eye height when `fromEyes`).
+float distanceToGoal(Pos p, Goal const& g);
+inline bool goalReached(Pos p, Goal const& g) { return distanceToGoal(p, g) <= g.range + 1e-3f; }
+
 // Cell predicates, shared with the executor.
 bool canOccupy(Cell const& c);  // feet or head may be here
 bool canStandOn(Cell const& c); // a floor

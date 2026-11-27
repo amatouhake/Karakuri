@@ -70,7 +70,7 @@ Search::Search(Pos start, Goal goal, Options opt) : mGoal(goal), mOpt(opt), mSta
     mOpen.push({h(start) * mOpt.heuristicWeight, start});
 }
 
-static float distTo(Pos p, Goal const& g) {
+float distanceToGoal(Pos p, Goal const& g) {
     float ey = g.fromEyes ? 1.62f : 0.5f;
     float dx = (p.x + 0.5f) - (g.target.x + 0.5f);
     float dy = (p.y + ey) - (g.target.y + 0.5f);
@@ -78,8 +78,8 @@ static float distTo(Pos p, Goal const& g) {
     return std::sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-bool  Search::reached(Pos p) const { return distTo(p, mGoal) <= mGoal.range + 1e-3f; }
-float Search::h(Pos p) const { return std::max(0.0f, distTo(p, mGoal) - mGoal.range) * Costs::walk; }
+bool  Search::reached(Pos p) const { return goalReached(p, mGoal); }
+float Search::h(Pos p) const { return std::max(0.0f, distanceToGoal(p, mGoal) - mGoal.range) * Costs::walk; }
 
 void Search::relax(Pos from, Step step, float cost, int scaffold) {
     if (scaffold > mOpt.scaffoldBlocks) return;

@@ -37,7 +37,10 @@ protected:
     int  mTicks{0};
 };
 
-std::unique_ptr<Job> makeGoto(Vec3 target, float tolerance = 1.5f);
+// Pathfinder movement (src/core/Pathfinder.h): walks, digs, bridges and pillars as needed.
+std::unique_ptr<Job> makePathGoto(BlockPos target, float range = 0);
+// Moves until `block` is within `reach` of the eyes.
+std::unique_ptr<Job> makeApproach(BlockPos block, float reach);
 std::unique_ptr<Job> makeMine(BlockPos pos);
 std::unique_ptr<Job> makePlace(BlockPos pos);
 std::unique_ptr<Job> makeEat();
