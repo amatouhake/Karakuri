@@ -1,0 +1,9 @@
+.xmake/
+build/
+bin/
+/.vs/
+/.idea/
+/.claude/
+*.user
+*.log
+/AGENTS.local.md
