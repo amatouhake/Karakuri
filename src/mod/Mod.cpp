@@ -20,7 +20,6 @@ namespace karakuri {
 
 namespace {
 std::vector<ll::event::ListenerPtr> gListeners;
-bool                                gCommandsRegistered = false;
 } // namespace
 
 Mod& Mod::getInstance() {
@@ -31,11 +30,8 @@ Mod& Mod::getInstance() {
 bool Mod::load() { return true; }
 
 bool Mod::enable() {
-    if (!gCommandsRegistered) {
-        // Commands cannot be unregistered, so they are registered once and check for bots themselves.
-        registerCommands();
-        gCommandsRegistered = true;
-    }
+    // LeviLamina drops a mod's command overloads when it is disabled, so register on every enable.
+    registerCommands();
     auto& bus   = ll::event::EventBus::getInstance();
     auto& bots  = BotManager::instance();
     gListeners.push_back(bus.emplaceListener<ll::event::ServerLevelTickEvent>([&bots](auto& ev) {
