@@ -35,6 +35,12 @@ Its feedback on the tools:
 - `find_blocks` sorts by distance only and does not group logs into trees.
 - Right after `spawn_bot` the bot is still falling into place (`on_ground: false`).
 
+**Follow-up (next commit, `Karakuri.dll` tested: SHA-256 `613403b95988677b9bec03ef112c1f51a9b1e219ee86a315c1bebfa1040a4eaa`;
+the commit only adds a sentence to the `mine` tool description).** Job results and `job_finished`
+events now carry `inventory_change`. Seen over MCP: `collect_items` returned
+`{"minecraft:oak_log": 1}` and its detail `inventory +1 oak_log`; `mine` returned an empty change
+because the drop was still on the ground, which its description now says.
+
 While collecting items in an earlier run, the bot dug through blocks to reach drops (the pathfinder
 may break blocks on the way).
 

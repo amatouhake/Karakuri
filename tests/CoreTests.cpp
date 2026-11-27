@@ -1,6 +1,7 @@
 // Unit tests for the pure core (no game types). Run: xmake build KarakuriTests && xmake run KarakuriTests
 
 #include "core/Events.h"
+#include "core/Inventory.h"
 #include "core/Job.h"
 #include "core/Reflex.h"
 
@@ -101,6 +102,15 @@ void events() {
     check(log.wait(4, std::chrono::seconds(5)).empty(), "shutdown wakes waiters");
 }
 
+void inventoryDiff() {
+    ItemCounts before{{"minecraft:dirt", 5}, {"minecraft:oak_log", 1}, {"minecraft:stick", 2}};
+    ItemCounts after{{"minecraft:dirt", 4}, {"minecraft:oak_log", 3}, {"minecraft:oak_sapling", 1}};
+    auto       c = diffCounts(before, after);
+    check(c.size() == 4, "diff lists every changed item");
+    check(formatChange(c) == "-1 dirt, +2 oak_log, +1 oak_sapling, -2 stick", "diff is sorted and formatted");
+    check(diffCounts(before, before).empty(), "no change, empty diff");
+}
+
 void reach() {
     check(withinReach(0, 0, 0, 3, 4, 0, 5), "distance 5 is within reach 5");
     check(!withinReach(0, 0, 0, 3, 4, 0.1f, 5), "just over reach is out");
@@ -115,6 +125,7 @@ int main() {
     reflexFight();
     reach();
     events();
+    inventoryDiff();
     pathfinderTests();
     if (gFailures == 0) std::printf("all tests passed\n");
     return gFailures == 0 ? 0 : 1;

@@ -38,8 +38,8 @@ SimulatedPlayer* BotManager::resolve(Bot const& bot) const {
     return p && p->isSimulated() ? static_cast<SimulatedPlayer*>(p) : nullptr;
 }
 
-void BotManager::emit(Bot const& bot, std::string kind, std::string detail, uint64_t jobId, std::string state) {
-    mEvents.push({0, mTick, bot.name, std::move(kind), jobId, std::move(state), std::move(detail)});
+void BotManager::emit(Bot const& bot, std::string kind, std::string detail, uint64_t jobId, std::string state, ItemChange change) {
+    mEvents.push({0, mTick, bot.name, std::move(kind), jobId, std::move(state), std::move(detail), std::move(change)});
 }
 
 std::optional<BotManager::Info> BotManager::info(std::string const& name) {
@@ -117,7 +117,8 @@ std::string BotManager::assign(std::string const& name, std::unique_ptr<Job> job
         logger().info("{} job {} cancelled: replaced", name, bot->job->describe());
         emit(*bot, "job_finished", bot->job->describe() + ": replaced", bot->jobId, "cancelled");
     }
-    bot->jobId = mNextJobId++;
+    bot->jobId         = mNextJobId++;
+    bot->invAtJobStart = inventoryCounts(*sp);
     if (jobId) *jobId = bot->jobId;
     logger().info("{} job {} started", name, job->describe());
     emit(*bot, "job_started", job->describe(), bot->jobId);
@@ -133,7 +134,8 @@ std::string BotManager::stop(std::string const& name) {
     if (sp && bot->reflex) bot->reflex->cancel(*sp);
     if (bot->job) {
         bot->lastResult = fmt::format("{}: cancelled", bot->job->describe());
-        emit(*bot, "job_finished", bot->job->describe() + ": stopped", bot->jobId, "cancelled");
+        auto change     = sp ? diffCounts(bot->invAtJobStart, inventoryCounts(*sp)) : ItemChange{};
+        emit(*bot, "job_finished", bot->job->describe() + ": stopped", bot->jobId, "cancelled", std::move(change));
     }
     bot->job.reset();
     bot->reflex.reset();
@@ -242,8 +244,14 @@ void BotManager::finishJob(Bot& bot, std::unique_ptr<Job>& slot, JobStep const& 
         r.reason
     );
     if (&slot == &bot.job) {
-        bot.lastResult = fmt::format("{}: {}{}", what, toString(r.state), r.reason.empty() ? "" : " (" + r.reason + ")");
-        emit(bot, "job_finished", r.reason.empty() ? what : what + ": " + r.reason, bot.jobId, toString(r.state));
+        std::string reason = r.reason;
+        ItemChange  change;
+        if (auto* sp = resolve(bot)) {
+            change = diffCounts(bot.invAtJobStart, inventoryCounts(*sp));
+            if (!change.empty()) reason += (reason.empty() ? "" : "; ") + std::string("inventory ") + formatChange(change);
+        }
+        bot.lastResult = fmt::format("{}: {}{}", what, toString(r.state), reason.empty() ? "" : " (" + reason + ")");
+        emit(bot, "job_finished", reason.empty() ? what : what + ": " + reason, bot.jobId, toString(r.state), std::move(change));
     }
     slot.reset();
 }

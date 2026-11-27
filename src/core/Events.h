@@ -3,6 +3,8 @@
 // Thread-safe event log (docs/DESIGN.md 5.5 "passed up"). The server thread appends; agent-facing
 // threads (MCP) read or block until something they care about arrives. Pure: no game types.
 
+#include "core/Inventory.h"
+
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -23,6 +25,7 @@ struct Event {
     uint64_t    jobId{0};
     std::string state;  // job_finished: done / failed / cancelled
     std::string detail; // human-readable
+    ItemChange  inventoryChange; // job_finished: what the job picked up (+) or used (-)
 };
 
 class EventLog {

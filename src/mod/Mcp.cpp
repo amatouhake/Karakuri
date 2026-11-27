@@ -224,6 +224,11 @@ json eventJson(Event const& e) {
     json j{{"id", e.id}, {"tick", e.tick}, {"bot", e.bot}, {"kind", e.kind}, {"detail", e.detail}};
     if (e.jobId) j["job_id"] = e.jobId;
     if (!e.state.empty()) j["state"] = e.state;
+    if (!e.inventoryChange.empty()) {
+        json c = json::object();
+        for (auto const& [name, d] : e.inventoryChange) c[name] = d;
+        j["inventory_change"] = c;
+    }
     return j;
 }
 
@@ -250,8 +255,10 @@ json startJob(json const& a, std::function<std::unique_ptr<Job>(json const&)> ma
             1
         );
         if (!evs.empty()) {
+            auto ev       = eventJson(evs[0]);
             out["state"]  = evs[0].state;
             out["detail"] = evs[0].detail;
+            out["inventory_change"] = ev.value("inventory_change", json::object());
         }
     }
     out["event_cursor"] = BotManager::instance().events().lastId();
@@ -293,7 +300,8 @@ std::vector<Tool> const& tools() {
          [](json const& a) { return startJob(a, [](json const& a) { return makePathGoto(blockArg(a)); }); }},
         {"mine",
          "Break block (x,y,z), walking within reach first. Uses the best hotbar tool only while pathing; for the "
-         "block itself it uses the held item (see hold). Replaces the current job.",
+         "block itself it uses the held item (see hold). The drop stays on the ground unless the bot stands on it: "
+         "call collect_items afterwards. Replaces the current job.",
          obj({{"bot", kBot}, {"x", kInt}, {"y", kInt}, {"z", kInt}, {"wait_seconds", kWait}}, {"bot", "x", "y", "z"}),
          [](json const& a) { return startJob(a, [](json const& a) { return makeMine(blockArg(a)); }); }},
         {"place",
@@ -311,7 +319,8 @@ std::vector<Tool> const& tools() {
         {"eat", "Eat food from the hotbar (only works when not full).", obj({{"bot", kBot}, {"wait_seconds", kWait}}, {"bot"}),
          [](json const& a) { return startJob(a, [](json const&) { return makeEat(); }); }},
         {"collect_items",
-         "Walk over dropped items near the bot (radius max 16) to pick them up. Mining leaves drops on the ground.",
+         "Walk over dropped items near the bot (radius max 16) to pick them up. Mining leaves drops on the ground; "
+         "the result's inventory_change says what was picked up.",
          obj({{"bot", kBot}, {"radius", kInt}, {"wait_seconds", kWait}}, {"bot"}),
          [](json const& a) {
              return startJob(a, [](json const& a) { return makeCollect((float)std::clamp(optInt(a, "radius", 8), 1, 16)); });
@@ -350,7 +359,8 @@ std::vector<Tool> const& tools() {
          [](json const& a) { return onGame([=] { return getBlock(a); }); }},
         {"wait_for_event",
          "Wait for bot events newer than `after` (an event id or event_cursor; 0 = everything kept). Kinds: "
-         "job_started, job_finished (state done/failed/cancelled), reflex, hurt, died, respawned, spawned, removed. "
+         "job_started, job_finished (state done/failed/cancelled, with inventory_change: items gained or used), "
+         "reflex, hurt, died, respawned, spawned, removed. "
          "Returns as soon as something matches, or after timeout_seconds (max 60) with an empty list.",
          obj({{"after", kInt}, {"bot", kBot}, {"kinds", {{"type", "array"}, {"items", {{"type", "string"}}}}},
               {"timeout_seconds", {{"type", "number"}}}},

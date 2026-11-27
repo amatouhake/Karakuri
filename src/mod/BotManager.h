@@ -26,6 +26,7 @@ struct Bot {
     std::string          name;
     std::unique_ptr<Job> job;    // the task given by a command or agent
     uint64_t             jobId{0};
+    ItemCounts           invAtJobStart; // to report what the job picked up or used
     std::unique_ptr<Job> reflex; // an L0 reflex that has taken over from `job`
     ReflexArbiter        arbiter;
     bool                 reflexesEnabled{true};
@@ -81,7 +82,7 @@ private:
     void             tickBot(Bot& bot, SimulatedPlayer& sp);
     void             finishJob(Bot& bot, std::unique_ptr<Job>& slot, JobStep const& r, char const* kind);
     void             publishNames();
-    void             emit(Bot const& bot, std::string kind, std::string detail, uint64_t jobId = 0, std::string state = {});
+    void             emit(Bot const& bot, std::string kind, std::string detail, uint64_t jobId = 0, std::string state = {}, ItemChange change = {});
 
     std::map<std::string, Bot> mBots;
     int64_t                    mTick{0};
