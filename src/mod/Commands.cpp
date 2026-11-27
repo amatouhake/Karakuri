@@ -114,8 +114,8 @@ void registerCommands() {
     );
     cmd.overload<BotAt>().text("goto").required("bot").required("pos").execute(
         [&bots](CommandOrigin const& origin, CommandOutput& out, BotAt const& p, Command const& c) {
-            auto pos = origin.getExecutePosition(c.mVersion, p.pos);
-            reply(out, bots.assign(p.bot, makeGoto(pos)), "goto started");
+            auto pos = toBlock(origin.getExecutePosition(c.mVersion, p.pos));
+            reply(out, bots.assign(p.bot, makePathGoto(pos)), "goto started");
         }
     );
     cmd.overload<BotAt>().text("mine").required("bot").required("pos").execute(
@@ -145,6 +145,7 @@ void registerCommands() {
             reply(out, bots.assign(p.bot, makeAttack(std::nullopt)), "attack started");
         }
     );
+    registerDebugCommands(cmd);
 }
 
 } // namespace karakuri

@@ -9,6 +9,34 @@ here; only behavior read from the server log is. Raw logs are not kept in the re
 - No real client connected: everything was driven from the server console with
   [`tools/bds_driver.py`](../tools/bds_driver.py).
 
+## 2026-11-28: pathfinder
+
+Build: `8d00003`, `Karakuri.dll` SHA-256 `c339582e87c820ed8d8605cf7041a921e458ee2af549a485d97d985ea91d64c8`.
+Test structures were rebuilt before the run (a stone strip at y=99, a 4-block gap, a sealed stone
+box, a 3-high stone pillar).
+
+| Case | Seen |
+|---|---|
+| Flat strip, 20 and 40 blocks (the engine's navigation failed beyond 16) | `done`, 0 replans; plans of 22 and 42 steps took 0.2 and 0.4 ms |
+| 4-block gap on the strip, 16 cobblestone in the hotbar | Plan with 4 bridge steps; `done`, 0 replans; four cobblestone used |
+| Top of the pillar (6,70,6) from the ground | Plan: walk 5, ascend 1, pillar 2; `done`, 0 replans |
+| Inside the sealed box (1,67,-7) | Plan: pillar 1, 2 blocks broken, 1184 nodes in 20 ms; `done`, 0 replans |
+| From the origin to (12,68,12) (the engine found no path from there) | `done`, 0 replans |
+| Across the area where a bot once fell into a hole, to (0,67,27) | `done`, health stayed 20 |
+| `mine` on a block 8 blocks away | Walked within reach (11 steps), then broke it |
+| A husk attack during a `goto` | The fight reflex took over and killed it; the job replanned from where the bot stood and finished |
+
+Limits seen in this run:
+
+- On an earlier development build, a target in mid-air over a lake ((0,67,30)) used up the scaffold
+  blocks on a partial path and then failed with `no path`; a plan that hit that build's 40000-node
+  limit took about 1.6 s of server time, at up to 3000 nodes per tick. `8d00003` caps plans at 20000
+  nodes and 800 nodes per tick; a long failing plan was not timed on it.
+- The fight reflex fights with whatever is in hand (it killed the husk with a wooden pickaxe in 7
+  hits while a sword was in the hotbar).
+- `attack` still chases with the engine's navigation (16-block limit, does not avoid drops).
+- Water is avoided, not swum through.
+
 ## 2026-11-28: bot manager, first skills and reflexes
 
 Builds:

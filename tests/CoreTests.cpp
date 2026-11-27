@@ -5,9 +5,11 @@
 
 #include <cstdio>
 
-namespace {
+void pathfinderTests();
 
+namespace {
 int gFailures = 0;
+}
 
 void check(bool ok, char const* what) {
     if (!ok) {
@@ -15,6 +17,8 @@ void check(bool ok, char const* what) {
         std::printf("FAIL: %s\n", what);
     }
 }
+
+namespace {
 
 using namespace karakuri;
 
@@ -91,6 +95,7 @@ int main() {
     reflexEat();
     reflexFight();
     reach();
+    pathfinderTests();
     if (gFailures == 0) std::printf("all tests passed\n");
     return gFailures == 0 ? 0 : 1;
 }

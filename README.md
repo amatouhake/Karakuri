@@ -15,8 +15,10 @@ A [LeviLamina](https://github.com/LiteLDev/LeviLamina) mod for Bedrock Dedicated
 
 What exists today:
 
-- Bots you can spawn and give simple jobs from commands: walk, mine, place,
-  eat and attack, with reflexes that fight back and eat on their own. What
+- Bots you can spawn and give simple jobs from commands: go somewhere, mine,
+  place, eat and attack, with reflexes that fight back and eat on their own.
+  Going somewhere uses Karakuri's own pathfinder, which digs through walls,
+  bridges gaps and pillars up with blocks from the hotbar. What
   was seen working on a live server, and what was not checked yet, is in
   [docs/VALIDATION.md](docs/VALIDATION.md).
 - [Design notes](docs/DESIGN.md): goals, the layered AI architecture, the bot
@@ -24,8 +26,7 @@ What exists today:
 - [Spike 0](docs/SPIKE-0.md): what BDS's `SimulatedPlayer` does on a live
   server, which shaped the design. Its probe code is in [`spike/`](spike).
 
-Not there yet: a pathfinder that digs and builds (the engine's navigation only
-walks, and only up to 16 blocks), crafting, furnaces, chests, and the agent interface
+Not there yet: crafting, furnaces, chests, swimming, and the agent interface
 (MCP).
 
 ## What it aims to be
@@ -52,14 +53,15 @@ The intended users are server operators and their players.
 | `kr spawn <name> [pos]` | Spawn a survival bot (at your position when run by a player) |
 | `kr remove <bot>` / `kr list` | Remove a bot / list bots |
 | `kr status <bot>` | Position, health, hunger, current job, last result, inventory |
-| `kr goto <bot> <pos>` | Walk to a position up to 16 blocks away (walking only, for now) |
-| `kr mine <bot> <pos>` | Break a block within reach, with whatever the bot holds |
-| `kr place <bot> <pos>` | Place the held block at a position within reach |
+| `kr goto <bot> <pos>` | Go to a position, digging, bridging and pillaring when needed (scaffold blocks such as dirt or cobblestone must be in the hotbar) |
+| `kr mine <bot> <pos>` | Walk within reach and break a block with whatever the bot holds |
+| `kr place <bot> <pos>` | Walk within reach and place the held block |
 | `kr hold <bot> <slot>` | Select a hotbar slot (0–8) |
 | `kr eat <bot>` | Eat food from the hotbar |
 | `kr attack <bot>` | Attack the nearest monster |
 | `kr stop <bot>` | Cancel the current job |
 | `kr reflexes <bot> on\|off` | Turn the automatic fight and eat reflexes on or off |
+| `kr debug ...` | Developer probes (block classification, movement primitives) |
 
 Jobs run in the background; their results go to the server log and to
 `kr status`. A dead bot respawns on its own after one second.

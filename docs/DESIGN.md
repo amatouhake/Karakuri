@@ -73,7 +73,7 @@ LeviLamina exposes BDS's `SimulatedPlayer` (derived from `ServerPlayer`).
   - The respawn point is the spawn position, so the mod must manage it.
   - Reach is not enforced for simulated players, so skills enforce it (8.1).
   - Some `simulate*` calls report success when nothing happened, so skills confirm results in the world.
-  - `simulateNavigateToLocation` only walks, and finds no path to targets more than 16 blocks away (measured on flat ground). It does not dig, pillar up or bridge.
+  - `simulateNavigateToLocation` only walks, and finds no path to targets more than 16 blocks away (measured on flat ground). It does not dig, pillar up or bridge. Karakuri plans its own paths and moves with `simulateMoveToLocation` plus jumps.
 - No systematic list of behavioral differences from real players (achievements and so on) has been found.
 
 **Existing implementation worth studying**: [CoralFans-Dev/CFSP](https://github.com/CoralFans-Dev/CFSP) (AGPL-3.0, supports 26.60.*, maintained)
@@ -204,8 +204,8 @@ If learned models are added, start with narrow specialist models, not a general 
 1. A base that creates and drives `SimulatedPlayer` on LeviLamina. **Done**: `BotManager` spawns and removes named bots, pins respawn points, respawns dead bots, and runs one per-tick driver (observe → L0 → job step). Game pointers are never kept across ticks.
 2. L0 reflexes and the basic L1 skills (move, mine, place, craft, eat, chest work).
    - **Done**: jobs `goto` (engine navigation), `mine`, `place`, `eat`, `attack`, each cancellable and ending in `done` or a failure reason. Reflexes `fight` (when hurt with a monster near) and `eat` (when hungry) pause the job and resume it afterwards. Job bookkeeping and reflex arbitration are pure headers in `src/core` with unit tests.
-   - **Next**: a pathfinder with digging, scaffolding and bridging (the engine's navigation only walks, up to 16 blocks), then crafting, smelting and chest work by direct manipulation (8.1), and a low-health reflex.
-   - The pathfinder is pure A* over a block-query interface, with tests, and is the biggest piece of L1 work.
+   - **Done**: a pathfinder (`src/core/Pathfinder.h`): resumable A* over a block-query interface with walk, step up, drop (up to 3), dig through, bridge, pillar and dig down; no digging next to liquids or under falling blocks; scaffold blocks come from the hotbar. `goto` uses it and executes one step at a time, confirming each step and replanning on mismatch; `mine` and `place` walk within reach first.
+   - **Next**: crafting, smelting and chest work by direct manipulation (8.1), weapon choice and a low-health reflex, swimming, and moving `attack`'s chase onto the pathfinder.
 3. Expose this as MCP and use Claude Code itself as the first agent. No LLM inside the mod: the fastest way to see how practical it is.
    - This is a prototype exception: Claude Code (in the L5 role) calls L1 skills directly. The 5.5 rule "L5 does not drive L1 directly" applies once L3 exists.
    - `run_script` and event waiting are built here too.
