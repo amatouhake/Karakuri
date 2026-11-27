@@ -111,7 +111,7 @@ public:
 
     JobStep step(SimulatedPlayer& sp) override {
         auto& region = sp.getDimensionBlockSource();
-        if (mStarted) {
+        if (mClicked) {
             // The engine reports success even when nothing was placed, so check the world.
             if (!isAir(region, mPos)) return JobStep::done(fmt::format("placed {}", blockName(region, mPos)));
             return JobStep::fail("nothing was placed");
@@ -140,7 +140,7 @@ public:
             Vec3 hit{0.5f - s.off.x * 0.5f, 0.5f - s.off.y * 0.5f, 0.5f - s.off.z * 0.5f};
             sp.simulateLookAt(center(mPos), sim::LookDuration::Instant);
             sp.simulateUseItemInSlotOnBlock(sp.getSelectedItemSlot(), n, s.face, hit);
-            mStarted = true;
+            mClicked = true; // survives pause(): a reflex between click and check must not hide the result
             return JobStep::running();
         }
         return JobStep::fail("no solid block next to the target to place against");
@@ -148,6 +148,7 @@ public:
 
 private:
     BlockPos mPos;
+    bool     mClicked{false};
 };
 
 class EatJob final : public Job {

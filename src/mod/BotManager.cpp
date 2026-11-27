@@ -166,6 +166,7 @@ void BotManager::onDeath(SimulatedPlayer& sp) {
     bot->job.reset();
     bot->reflex.reset();
     bot->arbiter.reset();
+    bot->lastHurtTick = -100000; // do not respawn straight into a fight with the killer
     // A bot that dies before ever standing still (spawned in mid-air, killed by the landing)
     // gets its respawn point where it landed, if that spot is solid ground and open air.
     if (!bot->respawnPointSet) {
@@ -207,12 +208,17 @@ void BotManager::tick(Level&) {
 
 void BotManager::tickBot(Bot& bot, SimulatedPlayer& sp) {
     if (!sp.isAlive()) {
-        if (bot.respawnAt >= 0 && mTick >= bot.respawnAt) {
-            bot.respawnAt = -1;
+        // Keep trying until the bot is back, also after a death the event listener missed.
+        if (bot.respawnAt < 0) bot.respawnAt = mTick + kRespawnDelay;
+        if (mTick >= bot.respawnAt) {
             sp.simulateRespawn();
-            logger().info("{} respawned: {}", bot.name, describe(sp));
+            bot.respawnAt = mTick + kRespawnDelay;
         }
         return;
+    }
+    if (bot.respawnAt >= 0) {
+        bot.respawnAt = -1;
+        logger().info("{} respawned: {}", bot.name, describe(sp));
     }
 
     // The respawn point defaults to the spawn position, so a bot spawned in mid-air would fall to
@@ -245,7 +251,16 @@ void BotManager::tickBot(Bot& bot, SimulatedPlayer& sp) {
                 if (bot.job) bot.job->pause(sp);
                 bot.reflex = now == Reflex::Fight ? makeAttack(std::nullopt, kThreatRadius) : makeEat();
             }
-            logger().info("{} reflex {} -> {}", bot.name, toString(before), toString(now));
+            logger().info(
+                "{} reflex {} -> {} (hp {:.0f}, hunger {:.0f}, threat {}, hurt {} ticks ago)",
+                bot.name,
+                toString(before),
+                toString(now),
+                s.health,
+                s.hunger,
+                s.threatNear,
+                s.ticksSinceHurt
+            );
         }
     }
 
