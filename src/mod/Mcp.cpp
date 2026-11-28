@@ -5,6 +5,7 @@
 #include "mod/Mod.h"
 #include "mod/World.h"
 
+#include "ll/api/service/Bedrock.h"
 #include "ll/api/thread/ServerThreadExecutor.h"
 
 #include "mc/server/SimulatedPlayer.h"
@@ -13,6 +14,7 @@
 #include "mc/world/actor/player/Player.h"
 #include "mc/world/item/ItemStack.h"
 #include "mc/world/level/BlockSource.h"
+#include "mc/world/level/Level.h"
 #include "mc/world/level/block/Block.h"
 #include "mc/world/phys/AABB.h"
 
@@ -128,6 +130,8 @@ json botStatus(std::string const& name) {
     out["alive"]         = sp->isAlive();
     out["on_ground"]     = sp->isOnGround();
     out["selected_slot"] = sp->getSelectedItemSlot();
+    out["is_night"]      = BotManager::instance().isNight();
+    if (auto level = ll::service::getLevel()) out["time_of_day"] = level->getTime() % 24000;
     json inv             = json::array();
     auto& container      = sp->getInventory();
     for (int s = 0; s < container.getContainerSize(); ++s) {
@@ -364,7 +368,17 @@ std::vector<Tool> const& tools() {
               {"wait_seconds", kWait}},
              {"bot"}),
          [](json const& a) { return startJob(a, [](json const& a) { return chestJob(a, false); }); }},
-        {"attack", "Attack the nearest monster within 16 blocks.", obj({{"bot", kBot}, {"wait_seconds", kWait}}, {"bot"}),
+        {"sleep",
+         "Sleep in a bed within 16 blocks (or place one from the inventory) until morning. Only works at night; "
+         "sleeping skips the night. Monsters nearby prevent sleeping.",
+         obj({{"bot", kBot}, {"wait_seconds", kWait}}, {"bot"}),
+         [](json const& a) { return startJob(a, [](json const&) { return makeSleep(); }); }},
+        {"shelter",
+         "Wall the bot in with scaffold blocks from the inventory (sides at feet and head height, and a roof; up to "
+         "9 blocks) and wait inside. The job runs until stopped or replaced; goto digs back out.",
+         obj({{"bot", kBot}, {"wait_seconds", kWait}}, {"bot"}),
+         [](json const& a) { return startJob(a, [](json const&) { return makeShelter(); }); }},
+        {"attack", "Attack the nearest monster within 16 blocks, with the best weapon in the hotbar.", obj({{"bot", kBot}, {"wait_seconds", kWait}}, {"bot"}),
          [](json const& a) { return startJob(a, [](json const&) { return makeAttack(std::nullopt); }); }},
         {"stop", "Cancel the current job.", obj({{"bot", kBot}}, {"bot"}), [](json const& a) {
              return onGame([=] {
@@ -399,7 +413,7 @@ std::vector<Tool> const& tools() {
         {"wait_for_event",
          "Wait for bot events newer than `after` (an event id or event_cursor; 0 = everything kept). Kinds: "
          "job_started, job_finished (state done/failed/cancelled, with inventory_change: items gained or used), "
-         "reflex, hurt, died, respawned, spawned, removed. "
+         "reflex (none/flee/fight/eat), hurt, died, respawned, spawned, removed, and the world events night and day. "
          "Returns as soon as something matches, or after timeout_seconds (max 45) with an empty list.",
          obj({{"after", kInt}, {"bot", kBot}, {"kinds", {{"type", "array"}, {"items", {{"type", "string"}}}}},
               {"timeout_seconds", {{"type", "number"}}}},
@@ -416,7 +430,7 @@ std::vector<Tool> const& tools() {
                  after,
                  std::chrono::milliseconds((int)(timeout * 1000)),
                  [&](Event const& e) {
-                     if (!botName.empty() && e.bot != botName) return false;
+                     if (!botName.empty() && !e.bot.empty() && e.bot != botName) return false; // world events match any bot
                      return kinds.empty() || std::find(kinds.begin(), kinds.end(), e.kind) != kinds.end();
                  },
                  50
@@ -462,7 +476,8 @@ json handle(json const& msg) {
              "chest_take, collect_items, eat, attack) run "
              "in the background: pass wait_seconds to wait for the result, or call wait_for_event with the returned "
              "event_cursor. Use bot_status, find_blocks, nearby_entities and get_block to look around. Coordinates "
-             "are block coordinates; y is up."},
+             "are block coordinates; y is up. Bots fight back when hurt, flee at low health and eat when hungry on "
+             "their own (reflexes). Nights bring monsters: sleep in a bed or take shelter."},
         });
     }
     if (method == "ping") return rpcResult(id, json::object());

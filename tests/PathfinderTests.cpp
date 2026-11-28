@@ -214,6 +214,27 @@ void unreachableAndBudget() {
     check(!part.path.empty() && part.path.back().to.x > 5, "budget: partial path heads toward the goal");
 }
 
+void swimAcross() {
+    // A water channel at feet level (x=3..5) over a deep floor: swim across it, never dive.
+    MapWorld w({corridor("BBBBBBBBB"), corridor("BBBWWWBBB"), corridor("...WWW..."), corridor("........."), corridor(".........", '.')});
+    auto     r = run(w, {0, 2, 1}, {{8, 2, 1}}, {.allowDig = false});
+    check(r.state == SearchState::Found, "swim: found");
+    check(count(r.path, Move::Swim) == 3, "swim: three swim steps across the channel");
+}
+
+void dropIntoWater() {
+    // A 7-block drop into water is fine; onto stone it would not be.
+    MapWorld w({
+        corridor("BBBBBBBB"), // y0
+        corridor("BBBBWWWW"), // y1: water x=4..7, right under the edge
+        corridor("BBBB...."), corridor("BBBB...."), corridor("BBBB...."), corridor("BBBB...."), corridor("BBBB...."),
+        corridor("BBBB...."), // y7: top floor ends at x=3
+        corridor("........"), corridor("........"), corridor("........", '.'),
+    });
+    auto r = run(w, {0, 8, 1}, {{6, 1, 1}}, {.allowDig = false});
+    check(r.state == SearchState::Found, "drop into deep water is allowed");
+}
+
 void unknownIsImpassable() {
     MapWorld w({corridor("BBBB"), corridor("...."), corridor("....")});
     auto     r = run(w, {0, 1, 1}, {{8, 1, 1}});
@@ -236,4 +257,6 @@ void pathfinderTests() {
     reachGoal();
     unreachableAndBudget();
     unknownIsImpassable();
+    swimAcross();
+    dropIntoWater();
 }

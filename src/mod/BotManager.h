@@ -37,6 +37,7 @@ struct Bot {
     int64_t              reflexRetryAt{0};
     bool                 respawnPointSet{false};
     int                  traceEvery{0}; // debug: log position every N ticks
+    bool                 surfacing{false}; // swimming up because the head is under water
 };
 
 class BotManager {
@@ -59,11 +60,13 @@ public:
     SimulatedPlayer*         player(std::string const& name);
 
     void tick(Level& level);
-    void onHurt(SimulatedPlayer& sp);
+    // `byEntity`: an attack (feeds the fight reflex); `cause`: a readable damage cause.
+    void onHurt(SimulatedPlayer& sp, bool byEntity, std::string const& cause);
     void onDeath(SimulatedPlayer& sp);
 
     [[nodiscard]] int64_t now() const { return mTick; }
     EventLog&             events() { return mEvents; }
+    [[nodiscard]] bool    isNight() const { return mNight; }
 
     struct Info {
         std::string      name;
@@ -87,6 +90,7 @@ private:
     std::map<std::string, Bot> mBots;
     int64_t                    mTick{0};
     uint64_t                   mNextJobId{1};
+    bool                       mNight{false};
     EventLog                   mEvents;
 };
 

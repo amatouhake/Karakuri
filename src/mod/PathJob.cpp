@@ -11,6 +11,7 @@
 #include "mc/server/SimulatedPlayer.h"
 #include "mc/world/level/BlockSource.h"
 #include "mc/world/level/block/Block.h"
+#include "mc/world/level/material/Material.h"
 
 #include <chrono>
 #include <cmath>
@@ -25,7 +26,16 @@ using path::Pos;
 Pos feetCell(SimulatedPlayer& sp) {
     auto f = sp.getFeetPos();
     // +0.5: standing on a slab or stair puts the feet half a block into the cell below.
-    return {(int)std::floor(f.x), (int)std::floor(f.y + 0.5f), (int)std::floor(f.z)};
+    Pos p{(int)std::floor(f.x), (int)std::floor(f.y + 0.5f), (int)std::floor(f.z)};
+    if (!sp.isInWater()) return p;
+    // In water the planner's "feet" cell is the surface cell (water with no water above). A
+    // swimming bot bobs: its feet can be up to about two blocks below that, or just above it.
+    auto& region = sp.getDimensionBlockSource();
+    auto  wet    = [&](int y) { return region.getBlock(BlockPos{p.x, y, p.z}).getMaterial().mLiquid; };
+    int   base   = (int)std::floor(f.y);
+    for (int y = base - 1; y <= base + 2; ++y)
+        if (wet(y) && !wet(y + 1)) return {p.x, y, p.z};
+    return p;
 }
 
 BlockPos toBlock(Pos p) { return {p.x, p.y, p.z}; }
@@ -54,7 +64,7 @@ public:
             mNeedPlan = true;
         }
         Pos feet = feetCell(sp);
-        if (sp.isOnGround() && path::goalReached(feet, mGoal)) {
+        if ((sp.isOnGround() || sp.isInWater()) && path::goalReached(feet, mGoal)) {
             sp.simulateStopMoving();
             return JobStep::done(fmt::format("{} replans", mReplans));
         }
@@ -96,14 +106,14 @@ private:
         mPlanMs += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
         if (st == path::SearchState::Running) return JobStep::running();
         mSteps = mSearch->path();
-        int moves[6]{}, breaks = 0;
+        int moves[7]{}, breaks = 0;
         for (auto const& s : mSteps) {
             ++moves[(int)s.move];
             breaks += (int)s.breaks.size();
         }
         logger().info(
-            "{} plan {}: {} steps (walk {}, ascend {}, descend {}, bridge {}, pillar {}, dig-down {}; {} blocks to "
-            "break), {} nodes, {:.1f} ms over the ticks",
+            "{} plan {}: {} steps (walk {}, ascend {}, descend {}, bridge {}, pillar {}, dig-down {}, swim {}; {} "
+            "blocks to break), {} nodes, {:.1f} ms over the ticks",
             sp.getRealName(),
             toString(st),
             mSteps.size(),
@@ -113,6 +123,7 @@ private:
             moves[3],
             moves[4],
             moves[5],
+            moves[6],
             breaks,
             mSearch->expanded(),
             mPlanMs
@@ -227,7 +238,8 @@ private:
         }
 
         // Move phase.
-        bool arrived = sp.isOnGround() && feet == s.to;
+        bool inWater = sp.isInWater();
+        bool arrived = (sp.isOnGround() || inWater) && feet == s.to;
         if (s.move == Move::Pillar || s.move == Move::DigDown) {
             if (arrived) return nextStep();
             if (mStepTicks > 40) return replan(sp, feet, "did not land");
@@ -237,6 +249,17 @@ private:
         Vec3  dst = floorCenter(s.to);
         float hd  = std::hypot(f.x - dst.x, f.z - dst.z);
         if (arrived && hd < 0.35f) return nextStep();
+        if (inWater) {
+            // Swim: head for the target with an upward component so the head stays out (moving up
+            // is what lifts a simulated player in water; jumping does not). A climb onto the bank
+            // still needs a jump.
+            float dx = dst.x - f.x, dz = dst.z - f.z, len = std::max(0.01f, std::hypot(dx, dz));
+            sp.simulateWorldMove(Vec3{dx / len * 0.8f, 0.6f, dz / len * 0.8f}, 1.0f);
+            if (s.move == Move::Ascend) sp.simulateJump();
+            mMoving = false; // re-issue a land move when the bot gets out
+            if (mStepTicks > 120) return replan(sp, feet, "swim step timed out");
+            return JobStep::running();
+        }
         if (!mMoving) {
             sp.simulateMoveToLocation(dst, 1.0f, true);
             mMoving = true;

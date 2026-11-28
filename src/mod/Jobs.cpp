@@ -7,6 +7,7 @@
 
 #include "mc/scripting/modules/gametest/ScriptNavigationResult.h"
 #include "mc/server/SimulatedPlayer.h"
+#include "mc/world/actor/ActorCategory.h"
 #include "mc/world/actor/player/Inventory.h"
 #include "mc/world/item/ItemStack.h"
 #include "mc/world/level/BlockSource.h"
@@ -64,7 +65,11 @@ public:
             if (isAir(region, mPos)) return mBlock.empty() ? JobStep::fail("block is air") : JobStep::done();
             if (auto r = approach(sp, mApproach, mPos); r) return *r;
             mBlock = blockName(region, mPos);
-            sp.setSelectedSlot(bestToolSlot(sp, region.getBlock(mPos)));
+            // Same rules as players: a block that needs a proper tool drops nothing without one,
+            // so refuse instead of breaking it for nothing.
+            int slot = harvestSlot(sp, region.getBlock(mPos));
+            if (slot < 0) return JobStep::fail(fmt::format("{} needs a better tool to drop anything; none in the hotbar", mBlock));
+            sp.setSelectedSlot(slot);
             sp.simulateLookAt(center(mPos), sim::LookDuration::Instant);
             if (!sp.simulateDestroyBlock(mPos, faceToward(mPos, sp.getEyePos())))
                 return JobStep::fail("engine refused to start breaking");
@@ -283,6 +288,10 @@ public:
         }
         sp.simulateStopMoving();
         mStarted = false;
+        if (!mArmed) {
+            sp.setSelectedSlot(bestWeaponSlot(sp));
+            mArmed = true;
+        }
         sp.simulateLookAt(*t, sim::LookDuration::Instant);
         if (mCooldown.ready() && sp.simulateAttack(t)) {
             ++mHits;
@@ -295,7 +304,57 @@ private:
     std::optional<ActorUniqueID> mTarget;
     float                        mRadius;
     int                          mHits{0};
+    bool                         mArmed{false};
     Cooldown                     mCooldown{10};
+};
+
+class FleeJob final : public Job {
+public:
+    std::string describe() const override { return "flee"; }
+
+    void pause(SimulatedPlayer& sp) override {
+        Job::pause(sp);
+        if (mWalk) mWalk->pause(sp);
+    }
+
+    JobStep step(SimulatedPlayer& sp) override {
+        ++mTicks;
+        if (mWalk && mTicks < mReplanAt) {
+            auto r = mWalk->step(sp);
+            if (!r.finished()) return JobStep::running();
+            mWalk.reset();
+            if (r.state == JobState::Failed) ++mFailures;
+        }
+        // Head away from the monsters: the sum of directions from each of them to the bot.
+        auto  c = sp.getPosition();
+        AABB  box{c - Vec3{16, 8, 16}, c + Vec3{16, 8, 16}};
+        float dx = 0, dz = 0;
+        for (auto* a : sp.getDimensionBlockSource().getEntities(box, 0.0f)) {
+            if (!a || !a->isAlive() || !a->hasCategory(ActorCategory::Monster)) continue;
+            auto  m = a->getPosition();
+            float d = std::max(0.5f, std::hypot(c.x - m.x, c.z - m.z));
+            dx += (c.x - m.x) / (d * d);
+            dz += (c.z - m.z) / (d * d);
+        }
+        auto f    = sp.getFeetPos();
+        int  fx   = (int)std::floor(f.x), fy = (int)std::floor(f.y + 0.5f), fz = (int)std::floor(f.z);
+        float len = std::hypot(dx, dz);
+        if (len < 1e-4f || mFailures >= 2) {
+            // Nowhere obvious to run (or running keeps failing): get out of reach by pillaring up.
+            mWalk     = makePathGoto(BlockPos{fx, fy + 3, fz}, 0.0f);
+            mFailures = 0;
+        } else {
+            int tx = fx + (int)std::lround(dx / len * 12), tz = fz + (int)std::lround(dz / len * 12);
+            mWalk  = makePathGoto(BlockPos{tx, fy, tz}, 4.0f);
+        }
+        mReplanAt = mTicks + 40; // re-aim every two seconds: the monsters move too
+        return JobStep::running();
+    }
+
+private:
+    std::unique_ptr<Job> mWalk;
+    int                  mReplanAt{0};
+    int                  mFailures{0};
 };
 
 } // namespace
@@ -304,6 +363,7 @@ std::unique_ptr<Job> makeMine(BlockPos pos) { return std::make_unique<MineJob>(p
 std::unique_ptr<Job> makePlace(BlockPos pos) { return std::make_unique<PlaceJob>(pos); }
 std::unique_ptr<Job> makeEat() { return std::make_unique<EatJob>(); }
 std::unique_ptr<Job> makeCollect(float radius) { return std::make_unique<CollectJob>(radius); }
+std::unique_ptr<Job> makeFlee() { return std::make_unique<FleeJob>(); }
 std::unique_ptr<Job> makeAttack(std::optional<ActorUniqueID> target, float radius) {
     return std::make_unique<AttackJob>(target, radius);
 }
