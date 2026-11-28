@@ -1,6 +1,7 @@
 #include "mod/Jobs.h"
 
 #include "mod/Game.h"
+#include "mod/World.h"
 
 #include "ll/api/service/Bedrock.h"
 
@@ -63,6 +64,7 @@ public:
             if (isAir(region, mPos)) return mBlock.empty() ? JobStep::fail("block is air") : JobStep::done();
             if (auto r = approach(sp, mApproach, mPos); r) return *r;
             mBlock = blockName(region, mPos);
+            sp.setSelectedSlot(bestToolSlot(sp, region.getBlock(mPos)));
             sp.simulateLookAt(center(mPos), sim::LookDuration::Instant);
             if (!sp.simulateDestroyBlock(mPos, faceToward(mPos, sp.getEyePos())))
                 return JobStep::fail("engine refused to start breaking");
@@ -99,11 +101,17 @@ public:
         if (mClicked) {
             // The engine reports success even when nothing was placed, so check the world.
             if (!isAir(region, mPos)) return JobStep::done(fmt::format("placed {}", blockName(region, mPos)));
-            return JobStep::fail("nothing was placed");
+            return JobStep::fail("nothing was placed (something may be in the way)");
         }
         if (sp.getSelectedItem().isNull()) return JobStep::fail("nothing in hand");
         if (!isAir(region, mPos)) return JobStep::fail(fmt::format("occupied by {}", blockName(region, mPos)));
         if (auto r = approach(sp, mApproach, mPos); r) return *r;
+        {
+            auto f = sp.getFeetPos();
+            int  fx = (int)std::floor(f.x), fy = (int)std::floor(f.y + 0.5f), fz = (int)std::floor(f.z);
+            if (fx == mPos.x && fz == mPos.z && (fy == mPos.y || fy + 1 == mPos.y))
+                return JobStep::fail("the bot is standing in that spot");
+        }
 
         // Click a solid neighbor on the face that points at the target.
         using F = ScriptModuleMinecraft::ScriptFacing;
@@ -186,7 +194,7 @@ public:
     }
 
     JobStep step(SimulatedPlayer& sp) override {
-        if (++mTicks > 20 * 90) return JobStep::fail(fmt::format("timed out after {} items", mPicked));
+        if (++mTicks > 20 * 90) return JobStep::fail(fmt::format("timed out after {} pickup attempts", mPicked));
         if (mWalk) {
             auto r = mWalk->step(sp);
             if (!r.finished()) return JobStep::running();

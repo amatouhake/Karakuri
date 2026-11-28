@@ -9,6 +9,42 @@ here; only behavior read from the server log is. Raw logs are not kept in the re
 - No real client connected: everything was driven from the server console with
   [`tools/bds_driver.py`](../tools/bds_driver.py).
 
+## 2026-11-28: crafting, smelting and chests
+
+Build: `f68b6fe`, `Karakuri.dll` SHA-256 `99d04bb0cfb2c5adde3b7c3e6347b201a3469897b5d734c8bf42e1a2e1be5712`,
+except the last table, which is on the next commit's build (SHA-256
+`77a8de8cd3adf67517371282e81368cafa1f38dfcfb3e722f17dbaccd453b3df`).
+
+**Skills over MCP** (items given with console commands first):
+
+| Case | Seen |
+|---|---|
+| `craft` oak_planks 8, stick 4, crafting_table | `done`; `inventory_change` -2 oak_log +8 oak_planks, -2 oak_planks +4 stick, -4 oak_planks +1 crafting_table |
+| `craft` wooden_pickaxe with 2 planks | `failed: missing ingredients` (needs 3) |
+| `craft` furnace (a 3x3 recipe) with no table nearby | Placed the crafting table from the hotbar, then crafted: -8 cobblestone, -1 crafting_table, +1 furnace |
+| `smelt` raw_iron 3 | Placed the furnace from the hotbar, loaded 1 coal, took 3 iron ingots after about 32 s |
+| `craft` iron_pickaxe | -3 iron_ingot, -2 stick, +1 iron_pickaxe |
+| `chest_put` / `chest_take` | Put 2 planks into a chest and took 1 back; taking diamonds failed with `the chest has none` |
+
+**Agent run: from nothing to an iron pickaxe.** A headless Claude Code (karakuri tools only,
+peaceful, daylight cycle off, leftover stations near the origin removed first) was asked to spawn a
+bot with an empty inventory and get an iron pickaxe. It succeeded in about 12.5 minutes of game
+time with 68 jobs and no deaths: logs, planks, a crafting table, a wooden pickaxe, a shaft dug down
+with `goto` to y=55, cobblestone, a stone pickaxe, coal ore, iron ore at y=44-45, a furnace, `smelt`,
+and the iron pickaxe. Its feedback, and what was done about it:
+
+| Feedback | Status |
+|---|---|
+| A furnace crafted with a full hotbar landed in slot 9 and could not be placed; working around it took about 15 calls | Fixed: station items are moved into the hotbar before placing (seen: a furnace in slot 9 was placed and used to smelt) |
+| Stations were searched only 4 blocks up and down, though the tool says 16 | Fixed: a full 16-block cube |
+| `wait_seconds` over the client's request timeout returned "operation timed out" with no job id | Fixed: waits are capped at 45 s, and the description points to `wait_for_event` |
+| `place` said "nothing was placed" when the bot stood in the spot | Fixed: `the bot is standing in that spot` (seen) |
+| `collect_items` timed out "after 145 items" while picking up one | Fixed wording: it counts pickup attempts |
+| Two iron ores broke with no drop | Not resolved: possibly the wrong tool tier, possibly lost in nearby water. `mine` should report the tool and refuse blocks the tool cannot harvest |
+| `goto` gave up on long digs through an aquifer with only "search limit reached" | Open: the search does not say water was the obstacle |
+| Scaffolding silently uses planks and dirt the agent wanted to keep | Open |
+| No "any log" search | Open |
+
 ## 2026-11-28: MCP server
 
 Build: the commit that adds this section, `Karakuri.dll` SHA-256

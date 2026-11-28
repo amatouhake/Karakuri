@@ -12,10 +12,11 @@ agents. This file is the working manual for coding agents.
   on a live server.
 - [docs/VALIDATION.md](docs/VALIDATION.md): what the mod was seen to do, per
   build. A server result goes there with the DLL hash.
-- `src/core`: pure logic (jobs, reflex arbitration, the pathfinder search)
+- `src/core`: pure logic (jobs, reflex arbitration, the pathfinder search,
+  ingredient allocation, inventory diffs)
   without game types, tested in `tests/` (the pathfinder on ASCII maps).
 - `src/mod`: game glue: `BotManager` (per-tick driver), `Jobs` and `PathJob`
-  (L1 skills, path execution), `World` (block classification for the
+  (L1 skills, path execution), `Crafting` (craft, smelt, chests), `World` (block classification for the
   pathfinder), `Commands`, `Debug` (`/kr debug` probes), `Mcp` (the MCP
   server and its tools), `Game` (helpers).
 - `src/core/Events.h`: the thread-safe event log that `wait_for_event` reads.
