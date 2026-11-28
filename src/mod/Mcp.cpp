@@ -218,7 +218,10 @@ json obj(json props, std::vector<std::string> required) {
 
 json const kBot  = {{"type", "string"}, {"description", "Bot name"}};
 json const kInt  = {{"type", "integer"}};
-json const kWait = {{"type", "number"}, {"description", "Seconds to wait for the job to finish before returning (0 = return at once, max 120)"}};
+json const kWait = {{"type", "number"},
+                    {"description",
+                     "Seconds to wait for the job to finish before returning (0 = return at once, max 45; longer jobs "
+                     "keep running: follow them with wait_for_event and the returned event_cursor)"}};
 
 json eventJson(Event const& e) {
     json j{{"id", e.id}, {"tick", e.tick}, {"bot", e.bot}, {"kind", e.kind}, {"detail", e.detail}};
@@ -245,7 +248,8 @@ json startJob(json const& a, std::function<std::unique_ptr<Job>(json const&)> ma
     });
     if (start.contains("error")) return start;
     uint64_t id   = start["job_id"];
-    double   wait = std::clamp(a.value("wait_seconds", 0.0), 0.0, 120.0);
+    // MCP clients time requests out (often around 60 s), so never hold one longer than this.
+    double   wait = std::clamp(a.value("wait_seconds", 0.0), 0.0, 45.0);
     json     out{{"bot", name}, {"job_id", id}, {"state", "running"}};
     if (wait > 0) {
         auto evs = BotManager::instance().events().wait(
@@ -396,7 +400,7 @@ std::vector<Tool> const& tools() {
          "Wait for bot events newer than `after` (an event id or event_cursor; 0 = everything kept). Kinds: "
          "job_started, job_finished (state done/failed/cancelled, with inventory_change: items gained or used), "
          "reflex, hurt, died, respawned, spawned, removed. "
-         "Returns as soon as something matches, or after timeout_seconds (max 60) with an empty list.",
+         "Returns as soon as something matches, or after timeout_seconds (max 45) with an empty list.",
          obj({{"after", kInt}, {"bot", kBot}, {"kinds", {{"type", "array"}, {"items", {{"type", "string"}}}}},
               {"timeout_seconds", {{"type", "number"}}}},
              {}),
@@ -407,7 +411,7 @@ std::vector<Tool> const& tools() {
              if (a.contains("kinds") && a["kinds"].is_array())
                  for (auto const& k : a["kinds"])
                      if (k.is_string()) kinds.push_back(k.get<std::string>());
-             double timeout = std::clamp(a.value("timeout_seconds", 20.0), 0.0, 60.0);
+             double timeout = std::clamp(a.value("timeout_seconds", 20.0), 0.0, 45.0);
              auto   evs     = BotManager::instance().events().wait(
                  after,
                  std::chrono::milliseconds((int)(timeout * 1000)),

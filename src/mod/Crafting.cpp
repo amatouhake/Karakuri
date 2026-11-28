@@ -146,7 +146,7 @@ std::optional<BlockPos> nearestBlock(Player& p, std::set<std::string> const& nam
     std::optional<BlockPos> best;
     int                     bestD = 1 << 30;
     for (int x = -radius; x <= radius; ++x)
-        for (int y = -4; y <= 4; ++y)
+        for (int y = -radius; y <= radius; ++y)
             for (int z = -radius; z <= radius; ++z) {
                 BlockPos q{c.x + x, c.y + y, c.z + z};
                 int      d = x * x + y * y + z * z;
@@ -164,6 +164,25 @@ int hotbarSlotOf(Player const& p, std::string const& name) {
     for (int i = 0; i < 9; ++i)
         if (!inv.getItem(i).isNull() && inv.getItem(i).getTypeName() == name) return i;
     return -1;
+}
+
+// Like hotbarSlotOf, but first swaps the item into the hotbar when it sits in the main inventory
+// (a crafted furnace often lands there when the hotbar is full).
+int bringToHotbar(Player& p, std::string const& name) {
+    if (int s = hotbarSlotOf(p, name); s >= 0) return s;
+    auto& inv  = p.getInventory();
+    int   from = -1;
+    for (int i = 9; i < inv.getContainerSize(); ++i)
+        if (!inv.getItem(i).isNull() && inv.getItem(i).getTypeName() == name) from = i;
+    if (from < 0) return -1;
+    int to = p.getSelectedItemSlot();
+    for (int i = 0; i < 9; ++i)
+        if (inv.getItem(i).isNull()) to = i; // prefer an empty hotbar slot
+    ItemStack a = inv.getItem(from), b = inv.getItem(to);
+    inv.setItem(to, a);
+    inv.setItem(from, b);
+    p.sendInventory(false);
+    return to;
 }
 
 // A free spot next to the bot to put a station on: air with solid ground, not where the bot stands.
@@ -203,10 +222,10 @@ public:
             return JobStep::running();
         }
         if (mPlaced++ > 0) return JobStep::fail(fmt::format("placing a {} failed", shortName(mItem)));
-        int slot = hotbarSlotOf(sp, mItem);
+        int slot = bringToHotbar(sp, mItem);
         if (slot < 0)
             return JobStep::fail(fmt::format(
-                "needs a {} within {} blocks, or one in the hotbar to place",
+                "needs a {} within {} blocks, or one in the inventory to place",
                 shortName(mItem),
                 kStationSearch
             ));

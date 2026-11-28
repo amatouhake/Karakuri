@@ -15,8 +15,9 @@ A [LeviLamina](https://github.com/LiteLDev/LeviLamina) mod for Bedrock Dedicated
 
 What exists today:
 
-- Bots you can spawn and give simple jobs from commands: go somewhere, mine,
-  place, eat and attack, with reflexes that fight back and eat on their own.
+- Bots you can spawn and give jobs from commands: go somewhere, mine, place,
+  craft, smelt, use chests, pick up items, eat and attack, with reflexes that
+  fight back and eat on their own.
   Going somewhere uses Karakuri's own pathfinder, which digs through walls,
   bridges gaps and pillars up with blocks from the hotbar. What
   was seen working on a live server, and what was not checked yet, is in
@@ -29,8 +30,8 @@ What exists today:
 - An MCP server inside the mod, so AI agents such as Claude Code can drive the
   bots (see [Agents (MCP)](#agents-mcp)).
 
-Not there yet: crafting, furnaces, chests, swimming, and running scripts in
-one call (`run_script`).
+Not there yet: swimming, choosing a weapon before a fight, fleeing at low
+health, and running scripts in one call (`run_script`).
 
 ## What it aims to be
 
@@ -57,12 +58,15 @@ The intended users are server operators and their players.
 | `kr remove <bot>` / `kr list` | Remove a bot / list bots |
 | `kr status <bot>` | Position, health, hunger, current job, last result, inventory |
 | `kr goto <bot> <pos>` | Go to a position, digging, bridging and pillaring when needed (scaffold blocks such as dirt or cobblestone must be in the hotbar) |
-| `kr mine <bot> <pos>` | Walk within reach and break a block with whatever the bot holds |
+| `kr mine <bot> <pos>` | Walk within reach and break a block with the best tool in the hotbar |
 | `kr place <bot> <pos>` | Walk within reach and place the held block |
 | `kr hold <bot> <slot>` | Select a hotbar slot (0–8) |
 | `kr eat <bot>` | Eat food from the hotbar |
 | `kr attack <bot>` | Attack the nearest monster |
 | `kr collect <bot>` | Walk over dropped items nearby to pick them up |
+| `kr craft <bot> <item> [count]` | Craft from the inventory with the game's recipes; 3x3 recipes use a crafting table nearby (or place one from the hotbar) |
+| `kr smelt <bot> <item> [count]` | Smelt in a furnace nearby (or place one), with fuel from the inventory |
+| `kr chest <bot> put\|take <item\|all> [count]` | Move items between the inventory and the nearest chest |
 | `kr stop <bot>` | Cancel the current job |
 | `kr reflexes <bot> on\|off` | Turn the automatic fight and eat reflexes on or off |
 | `kr debug ...` | Developer probes (block classification, movement primitives) |
@@ -88,8 +92,9 @@ claude mcp add --transport http karakuri http://127.0.0.1:47821/mcp
 ```
 
 Tools: `list_bots`, `spawn_bot`, `remove_bot`, `bot_status`, `goto`, `mine`,
-`place`, `hold`, `eat`, `attack`, `collect_items`, `stop`, `set_reflexes`,
-`find_blocks`, `nearby_entities`, `get_block`, `wait_for_event`.
+`place`, `hold`, `craft`, `smelt`, `chest_put`, `chest_take`, `collect_items`,
+`eat`, `attack`, `stop`, `set_reflexes`, `find_blocks`, `nearby_entities`,
+`get_block`, `wait_for_event`.
 
 Jobs run in the background. Pass `wait_seconds` to a job tool to get its
 result in the same call, or use `wait_for_event` with the returned
