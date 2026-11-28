@@ -16,7 +16,8 @@ agents. This file is the working manual for coding agents.
   ingredient allocation, inventory diffs)
   without game types, tested in `tests/` (the pathfinder on ASCII maps).
 - `src/mod`: game glue: `BotManager` (per-tick driver), `Jobs` and `PathJob`
-  (L1 skills, path execution), `Crafting` (craft, smelt, chests), `World` (block classification for the
+  (L1 skills, path execution), `Crafting` (craft, smelt, chests), `Survival`
+  (sleep, shelter), `World` (block classification for the
   pathfinder), `Commands`, `Debug` (`/kr debug` probes), `Mcp` (the MCP
   server and its tools), `Game` (helpers).
 - `src/core/Events.h`: the thread-safe event log that `wait_for_event` reads.

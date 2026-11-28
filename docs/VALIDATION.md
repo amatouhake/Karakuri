@@ -9,6 +9,51 @@ here; only behavior read from the server log is. Raw logs are not kept in the re
 - No real client connected: everything was driven from the server console with
   [`tools/bds_driver.py`](../tools/bds_driver.py).
 
+## 2026-11-28: surviving the night
+
+Build: `c7440a3`, `Karakuri.dll` SHA-256 `86936a03ab42cf4e291c5b3e6aad4dcbc5ed03493870c0c7fd6bdb83a08569cd`
+(some rows were seen on development builds just before it, as noted); the last table is on the
+next commit's build (SHA-256 `627decc8c4abb71d75c21550b098fe1620174fcbb7446259cf9a7a008f1dfbe4`).
+
+| Case | Seen |
+|---|---|
+| `mine` iron ore with only a wooden pickaxe | `failed: minecraft:iron_ore needs a better tool to drop anything`; with a stone pickaxe `done`, and `collect_items` got the raw iron |
+| Fight reflex with a pickaxe held and a sword in the hotbar | Switched to the sword, killed a husk in 3 hits |
+| Flee reflex (development build) | At 6 HP with two husks, fled about 40 blocks while health recovered. Died twice: once to hits during knockback, once in deep water (a husk followed it in, then drowning) |
+| Rising in deep water (`/kr debug rise*`) | Jumping bobs and sinks; moving straight up rises about 1.5 blocks per second |
+| Idle in deep water | Surfaced from y=55 and floated 20 s without damage |
+| `goto` out of deep water to the shore | 11 swim steps, out over the bank, `done`, no damage |
+| `sleep` by day | `failed: beds only work at night` |
+| `sleep` at night | Walked 19 steps to a bed and slept; the `day` event followed. With a bed only in the inventory it placed one and slept |
+| `shelter` at night, then a zombie summoned next to it | 10 cobblestone walls and roof; the bot stayed at 20 HP for 15 s |
+| `night` / `day` events | Arrive as world events (empty bot) and match any bot filter |
+
+**Agent run: through a night on normal difficulty.** A headless Claude Code (karakuri tools only)
+spawned a bot at dusk with an empty inventory and was told to keep it working and alive until
+daybreak. The bot was alive at 20 HP when day broke, but **it died three times** during the night,
+so representative task B is not passed yet:
+
+1. A creeper and a witch caught it while `shelter` stalled; the flee reflex ran it about 50 blocks
+   into more monsters and a second creeper killed it.
+2. Right after respawning at spawn, among zombies, with reflexes turned off by the agent.
+3. An arrow while walking away from zombies.
+
+The bot survived the last third of the night in a 1x1 hole the agent dug and capped by hand.
+Its feedback, and what was done:
+
+| Feedback | Status |
+|---|---|
+| A job sent just before death ran on the respawned bot | Fixed: jobs are refused while the bot is dead (seen) |
+| The fight reflex engaged zombies bare-handed | Fixed: without a weapon, the bot flees from 14 HP instead of 6 (unit tested) |
+| `shelter` stalled silently | Fixed: it centers the bot first and finishes `done` when closed, or fails naming the gaps (seen: `sheltered at (12,68,12)`) |
+| Some hurt events were missing (throttled to one per second) | Changed to two per second, and every damage cause is now named |
+| Flee runs away from the nearest attacker into other monsters, with no notion of safe ground | Open |
+| No "dig in and hold safe ground" job (what worked) | Open; candidate for the next round |
+| `mine` walks far on its own and spends blocks while pathing | Open |
+| `collect_items` sometimes stops 1.5 blocks short | Open |
+| `find_blocks` limited to 16 blocks; no "any log" search | Open |
+| Reading events from cursor 0 replays old night/day events | By design (use the returned cursor) |
+
 ## 2026-11-28: crafting, smelting and chests
 
 Build: `f68b6fe`, `Karakuri.dll` SHA-256 `99d04bb0cfb2c5adde3b7c3e6347b201a3469897b5d734c8bf42e1a2e1be5712`,

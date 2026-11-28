@@ -135,8 +135,15 @@ public:
         auto& region = sp.getDimensionBlockSource();
         if (!mStarted) {
             if (!sp.isOnGround()) return JobStep::running();
-            mFeet    = feetBlock(sp);
+            mFeet = feetBlock(sp);
+            // Stand in the middle of the cell first: a bot overlapping a wall cell blocks placing there.
+            sp.simulateMoveToLocation(Vec3{mFeet.x + 0.5f, (float)mFeet.y, mFeet.z + 0.5f}, 1.0f, false);
             mStarted = true;
+            return JobStep::running();
+        }
+        if (mTicks < 10) {
+            ++mTicks;
+            return JobStep::running();
         }
         if (++mTicks % 5 != 0) return JobStep::running();
         // Cells to close, in an order where each one has something to be placed against.
@@ -172,13 +179,13 @@ public:
             if (placed) return JobStep::running(); // one block per step; checked on the next round
             ++mUnsupported; // nothing to place against: try the next gap
         }
-        if (!mClosed && (open == 0 || mTicks > 20 * 15)) {
-            mClosed = true;
-            logger().info("{} is sheltered at ({},{},{}){}", sp.getRealName(), f.x, f.y, f.z,
-                          open == 0 ? "" : fmt::format(" with {} gaps that had nothing to place against", open));
-        }
         mUnsupported = 0;
-        return JobStep::running(); // stay inside until stopped or replaced
+        // Done once closed, or once only unsupported gaps are left (reported, so the agent can fix
+        // them). The bot simply stays inside afterwards.
+        if (open == 0) return JobStep::done(fmt::format("sheltered at ({},{},{})", f.x, f.y, f.z));
+        if (mTicks > 20 * 15)
+            return JobStep::fail(fmt::format("{} gaps had nothing to place against at ({},{},{})", open, f.x, f.y, f.z));
+        return JobStep::running();
     }
 
 private:

@@ -374,8 +374,9 @@ std::vector<Tool> const& tools() {
          obj({{"bot", kBot}, {"wait_seconds", kWait}}, {"bot"}),
          [](json const& a) { return startJob(a, [](json const&) { return makeSleep(); }); }},
         {"shelter",
-         "Wall the bot in with scaffold blocks from the inventory (sides at feet and head height, and a roof; up to "
-         "9 blocks) and wait inside. The job runs until stopped or replaced; goto digs back out.",
+         "Wall the bot in with scaffold blocks from the inventory (sides at feet and head height, a corner and a "
+         "roof; up to 10 blocks). Finishes when closed (the bot stays inside; goto digs back out), or fails naming "
+         "the gaps it could not close.",
          obj({{"bot", kBot}, {"wait_seconds", kWait}}, {"bot"}),
          [](json const& a) { return startJob(a, [](json const&) { return makeShelter(); }); }},
         {"attack", "Attack the nearest monster within 16 blocks, with the best weapon in the hotbar.", obj({{"bot", kBot}, {"wait_seconds", kWait}}, {"bot"}),

@@ -149,6 +149,14 @@ void reflexFlee() {
     s.threatNear = true;
     s.health     = 12;
     check(a.choose(s) == Reflex::Fight, "recovered with a threat: fight again");
+
+    ReflexArbiter b(cfg);
+    BodyState     u;
+    u.threatNear     = true;
+    u.ticksSinceHurt = 1;
+    u.health         = 14;
+    u.armed          = false;
+    check(b.choose(u) == Reflex::Flee, "unarmed: flee earlier instead of fighting");
 }
 
 void reach() {

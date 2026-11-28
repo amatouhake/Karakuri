@@ -1,6 +1,7 @@
 #include "mod/BotManager.h"
 
 #include "mod/Game.h"
+#include "mod/World.h"
 #include "mod/Mod.h"
 
 #include "ll/api/command/CommandRegistrar.h"
@@ -133,6 +134,7 @@ std::string BotManager::assign(std::string const& name, std::unique_ptr<Job> job
     if (!bot) return fmt::format("no bot named {}", name);
     auto* sp = resolve(*bot);
     if (!sp) return fmt::format("{} is not in the world", name);
+    if (!sp->isAlive()) return fmt::format("{} is dead and respawns in a moment; try again after the respawned event", name);
     if (bot->job) {
         bot->job->cancel(*sp);
         logger().info("{} job {} cancelled: replaced", name, bot->job->describe());
@@ -218,7 +220,7 @@ void BotManager::onHurt(SimulatedPlayer& sp, bool byEntity, std::string const& c
     auto* bot = find(sp.getRealName());
     if (!bot) return;
     if (byEntity) bot->lastHurtTick = mTick;
-    if (mTick - bot->lastHurtEventTick >= 20) { // at most one hurt event per second
+    if (mTick - bot->lastHurtEventTick >= 10) { // at most two hurt events per second
         bot->lastHurtEventTick = mTick;
         emit(*bot, "hurt", fmt::format("hp {} ({})", sp.getHealth(), cause));
     }
@@ -354,6 +356,7 @@ void BotManager::tickBot(Bot& bot, SimulatedPlayer& sp) {
         s.hasFood        = findFoodSlot(sp) >= 0;
         s.threatNear     = nearestMonster(sp, kThreatRadius) != nullptr;
         s.ticksSinceHurt = (int)std::min<int64_t>(mTick - bot.lastHurtTick, 1 << 30);
+        s.armed          = hasWeapon(sp);
 
         Reflex before = bot.arbiter.current();
         Reflex now    = bot.arbiter.choose(s);

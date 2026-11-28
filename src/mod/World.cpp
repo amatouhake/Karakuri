@@ -103,6 +103,15 @@ int bestWeaponSlot(Player const& p) {
     return best;
 }
 
+bool hasWeapon(Player const& p) {
+    auto& inv = p.getInventory();
+    for (int i = 0; i < 9; ++i) {
+        auto const& it = inv.getItem(i);
+        if (!it.isNull() && it.mItem.get() && it.mItem.get()->getAttackDamage() > 1) return true;
+    }
+    return false;
+}
+
 int harvestSlot(Player const& p, Block const& b) {
     int fastest = bestToolSlot(p, b);
     if (!b.getBlockType().mRequiresCorrectToolForDrops) return fastest;

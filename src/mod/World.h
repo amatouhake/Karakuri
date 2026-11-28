@@ -31,6 +31,8 @@ float breakTicks(Player& p, Block const& b);
 
 // The hotbar slot with the highest attack damage (the selected slot when nothing beats the hand).
 int bestWeaponSlot(Player const& p);
+// Whether any hotbar item hits harder than the bare hand.
+bool hasWeapon(Player const& p);
 // The best hotbar slot that also gets the block's drops when the block needs a proper tool;
 // -1 when the block needs one and no hotbar item qualifies.
 int harvestSlot(Player const& p, Block const& b);
