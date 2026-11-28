@@ -8,6 +8,7 @@
 #include "ll/api/command/CommandRegistrar.h"
 #include "ll/api/command/SoftEnum.h"
 
+#include "mc/deps/shared_types/v1_26_20/block/MaterialType.h"
 #include "mc/server/SimulatedPlayer.h"
 #include "mc/server/commands/Command.h"
 #include "mc/server/commands/CommandOrigin.h"
@@ -26,7 +27,7 @@ namespace karakuri {
 namespace dbg {
 using ll::command::SoftEnum;
 enum class DebugPosOp : int { probe, moveto, waypoints, stepto };
-enum class DebugOp : int { pillar, sneak, unsneak, jump };
+enum class DebugOp : int { pillar, sneak, unsneak, jump, risejump, risemove, riselocal, risenothing };
 enum class Dir : int { east, west, north, south };
 struct PosParams {
     DebugPosOp           op;
@@ -126,6 +127,30 @@ public:
 
 private:
     Vec3 mTarget;
+};
+
+// In water: tries one way of rising for 60 ticks and logs the height (see /kr debug rise*).
+class RiseProbe final : public Job {
+public:
+    explicit RiseProbe(int mode) : mMode(mode) {}
+    std::string describe() const override { return "debug rise"; }
+    JobStep     step(SimulatedPlayer& sp) override {
+        switch (mMode) {
+        case 0: sp.simulateJump(); break;
+        case 1: sp.simulateWorldMove(Vec3{0, 1, 0}, 1.0f); break;
+        case 2: sp.simulateLocalMove(Vec3{0, 1, 0}, 1.0f); break;
+        default: break;
+        }
+        if (mTicks % 10 == 0) {
+            auto f = sp.getFeetPos();
+            logger().info("[probe] rise mode={} t={} y={:.2f} inWater={} headUnder={}", mMode, mTicks, f.y, sp.isInWater(),
+                          sp.isUnderLiquid(SharedTypes::v1_26_20::MaterialType::Water));
+        }
+        return ++mTicks > 60 ? JobStep::done() : JobStep::running();
+    }
+
+private:
+    int mMode;
 };
 
 class WaypointProbe final : public Job {
@@ -257,6 +282,13 @@ void registerDebugCommands(ll::command::CommandHandle& cmd) {
                 return out.success(bots.assign(p.bot, std::make_unique<PillarProbe>()).empty() ? "ok" : "failed");
             case DebugOp::sneak:
                 return out.success(fmt::format("sneak {}", sp->simulateSneaking()));
+            case DebugOp::risejump:
+            case DebugOp::risemove:
+            case DebugOp::riselocal:
+            case DebugOp::risenothing:
+                return out.success(
+                    bots.assign(p.bot, std::make_unique<RiseProbe>((int)p.op - (int)DebugOp::risejump)).empty() ? "ok" : "failed"
+                );
             case DebugOp::jump:
                 return out.success(fmt::format("jump {}", sp->simulateJump()));
             case DebugOp::unsneak:

@@ -15,6 +15,9 @@
 #include "mc/server/SimulatedPlayer.h"
 #include "mc/world/actor/player/Player.h"
 
+#include <magic_enum.hpp>
+
+#include <string>
 #include <vector>
 
 namespace karakuri {
@@ -40,8 +43,14 @@ bool Mod::enable() {
     }));
     gListeners.push_back(bus.emplaceListener<ll::event::ActorHurtEvent>([&bots](ll::event::ActorHurtEvent& ev) {
         auto& a = ev.self();
-        if (a.isPlayer() && static_cast<Player&>(a).isSimulated() && ev.source().isEntitySource())
-            bots.onHurt(static_cast<SimulatedPlayer&>(a));
+        if (a.isPlayer() && static_cast<Player&>(a).isSimulated()) {
+            auto cause = magic_enum::enum_name(static_cast<SharedTypes::Legacy::ActorDamageCause>(ev.source().mCause));
+            bots.onHurt(
+                static_cast<SimulatedPlayer&>(a),
+                ev.source().isEntitySource(),
+                cause.empty() ? std::to_string((int)static_cast<SharedTypes::Legacy::ActorDamageCause>(ev.source().mCause)) : std::string(cause)
+            );
+        }
     }));
     gListeners.push_back(bus.emplaceListener<ll::event::PlayerDieEvent>([&bots](ll::event::PlayerDieEvent& ev) {
         if (ev.self().isSimulated()) bots.onDeath(static_cast<SimulatedPlayer&>(ev.self()));

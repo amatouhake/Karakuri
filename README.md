@@ -16,10 +16,11 @@ A [LeviLamina](https://github.com/LiteLDev/LeviLamina) mod for Bedrock Dedicated
 What exists today:
 
 - Bots you can spawn and give jobs from commands: go somewhere, mine, place,
-  craft, smelt, use chests, pick up items, eat and attack, with reflexes that
-  fight back and eat on their own.
+  craft, smelt, use chests, pick up items, eat, attack, sleep and take
+  shelter, with reflexes that fight back (with the best weapon), flee at low
+  health, eat and keep their head above water on their own.
   Going somewhere uses Karakuri's own pathfinder, which digs through walls,
-  bridges gaps and pillars up with blocks from the hotbar. What
+  bridges gaps, pillars up with blocks from the hotbar and swims. What
   was seen working on a live server, and what was not checked yet, is in
   [docs/VALIDATION.md](docs/VALIDATION.md).
 - [Design notes](docs/DESIGN.md): goals, the layered AI architecture, the bot
@@ -30,8 +31,8 @@ What exists today:
 - An MCP server inside the mod, so AI agents such as Claude Code can drive the
   bots (see [Agents (MCP)](#agents-mcp)).
 
-Not there yet: swimming, choosing a weapon before a fight, fleeing at low
-health, and running scripts in one call (`run_script`).
+Not there yet: diving, armor and shields, ranged combat, and running scripts in
+one call (`run_script`).
 
 ## What it aims to be
 
@@ -62,13 +63,15 @@ The intended users are server operators and their players.
 | `kr place <bot> <pos>` | Walk within reach and place the held block |
 | `kr hold <bot> <slot>` | Select a hotbar slot (0–8) |
 | `kr eat <bot>` | Eat food from the hotbar |
-| `kr attack <bot>` | Attack the nearest monster |
+| `kr attack <bot>` | Attack the nearest monster with the best weapon in the hotbar |
+| `kr sleep <bot>` | At night, sleep in a bed nearby (or place one from the inventory) until morning |
+| `kr shelter <bot>` | Wall the bot in with blocks and wait there |
 | `kr collect <bot>` | Walk over dropped items nearby to pick them up |
 | `kr craft <bot> <item> [count]` | Craft from the inventory with the game's recipes; 3x3 recipes use a crafting table nearby (or place one from the hotbar) |
 | `kr smelt <bot> <item> [count]` | Smelt in a furnace nearby (or place one), with fuel from the inventory |
 | `kr chest <bot> put\|take <item\|all> [count]` | Move items between the inventory and the nearest chest |
 | `kr stop <bot>` | Cancel the current job |
-| `kr reflexes <bot> on\|off` | Turn the automatic fight and eat reflexes on or off |
+| `kr reflexes <bot> on\|off` | Turn the automatic flee, fight and eat reflexes on or off |
 | `kr debug ...` | Developer probes (block classification, movement primitives) |
 
 Jobs run in the background; their results go to the server log and to
@@ -93,12 +96,13 @@ claude mcp add --transport http karakuri http://127.0.0.1:47821/mcp
 
 Tools: `list_bots`, `spawn_bot`, `remove_bot`, `bot_status`, `goto`, `mine`,
 `place`, `hold`, `craft`, `smelt`, `chest_put`, `chest_take`, `collect_items`,
-`eat`, `attack`, `stop`, `set_reflexes`, `find_blocks`, `nearby_entities`,
-`get_block`, `wait_for_event`.
+`eat`, `attack`, `sleep`, `shelter`, `stop`, `set_reflexes`, `find_blocks`,
+`nearby_entities`, `get_block`, `wait_for_event`.
 
 Jobs run in the background. Pass `wait_seconds` to a job tool to get its
 result in the same call, or use `wait_for_event` with the returned
-`event_cursor` to hear about job results, reflexes, damage and deaths.
+`event_cursor` to hear about job results, reflexes, damage (with its cause),
+deaths, and nightfall and daybreak.
 
 ## Platform
 

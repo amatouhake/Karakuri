@@ -173,6 +173,16 @@ void registerCommands() {
             reply(out, bots.assign(p.bot, std::move(job)), "chest job started");
         }
     );
+    cmd.overload<OneBot>().text("sleep").required("bot").execute(
+        [&bots](CommandOrigin const&, CommandOutput& out, OneBot const& p) {
+            reply(out, bots.assign(p.bot, makeSleep()), "sleep started");
+        }
+    );
+    cmd.overload<OneBot>().text("shelter").required("bot").execute(
+        [&bots](CommandOrigin const&, CommandOutput& out, OneBot const& p) {
+            reply(out, bots.assign(p.bot, makeShelter()), "shelter started");
+        }
+    );
     cmd.overload<OneBot>().text("collect").required("bot").execute(
         [&bots](CommandOrigin const&, CommandOutput& out, OneBot const& p) {
             reply(out, bots.assign(p.bot, makeCollect()), "collect started");

@@ -1,6 +1,7 @@
 #include "mod/BotManager.h"
 
 #include "mod/Game.h"
+#include "mod/World.h"
 #include "mod/Mod.h"
 
 #include "ll/api/command/CommandRegistrar.h"
@@ -10,15 +11,36 @@
 #include "mc/server/SimulatedPlayer.h"
 #include "mc/world/actor/player/Player.h"
 #include "mc/world/level/BlockSource.h"
+#include "mc/world/level/block/Block.h"
+#include "mc/world/level/material/Material.h"
 #include "mc/world/level/GameType.h"
 #include "mc/world/level/Level.h"
 #include "mc/world/level/dimension/Dimension.h"
+
+#include <cmath>
 
 namespace karakuri {
 
 namespace {
 constexpr int   kRespawnDelay = 20;
 constexpr float kThreatRadius = 6.0f;
+
+std::unique_ptr<Job> makeReflexJob(Reflex r) {
+    switch (r) {
+    case Reflex::Flee:
+        return makeFlee();
+    case Reflex::Fight:
+        return makeAttack(std::nullopt, kThreatRadius);
+    default:
+        return makeEat();
+    }
+}
+
+// Night as far as monsters and beds are concerned (ticks within the 24000-tick day).
+bool isNightTime(int64_t time) {
+    auto t = time % 24000;
+    return t >= 12542 && t < 23460;
+}
 } // namespace
 
 BotManager& BotManager::instance() {
@@ -112,6 +134,7 @@ std::string BotManager::assign(std::string const& name, std::unique_ptr<Job> job
     if (!bot) return fmt::format("no bot named {}", name);
     auto* sp = resolve(*bot);
     if (!sp) return fmt::format("{} is not in the world", name);
+    if (!sp->isAlive()) return fmt::format("{} is dead and respawns in a moment; try again after the respawned event", name);
     if (bot->job) {
         bot->job->cancel(*sp);
         logger().info("{} job {} cancelled: replaced", name, bot->job->describe());
@@ -193,13 +216,13 @@ std::string BotManager::status(std::string const& name) {
     );
 }
 
-void BotManager::onHurt(SimulatedPlayer& sp) {
+void BotManager::onHurt(SimulatedPlayer& sp, bool byEntity, std::string const& cause) {
     auto* bot = find(sp.getRealName());
     if (!bot) return;
-    bot->lastHurtTick = mTick;
-    if (mTick - bot->lastHurtEventTick >= 20) { // at most one hurt event per second
+    if (byEntity) bot->lastHurtTick = mTick;
+    if (mTick - bot->lastHurtEventTick >= 10) { // at most two hurt events per second
         bot->lastHurtEventTick = mTick;
-        emit(*bot, "hurt", fmt::format("hp {}", sp.getHealth()));
+        emit(*bot, "hurt", fmt::format("hp {} ({})", sp.getHealth(), cause));
     }
 }
 
@@ -256,8 +279,15 @@ void BotManager::finishJob(Bot& bot, std::unique_ptr<Job>& slot, JobStep const& 
     slot.reset();
 }
 
-void BotManager::tick(Level&) {
+void BotManager::tick(Level& level) {
     ++mTick;
+    if (mTick % 20 == 0) {
+        bool night = isNightTime(level.getTime());
+        if (night != mNight) {
+            mNight = night;
+            mEvents.push({0, mTick, "", night ? "night" : "day", 0, "", night ? "night fell" : "day broke", {}});
+        }
+    }
     for (auto& [name, bot] : mBots) {
         auto* sp = resolve(bot);
         if (!sp) continue;
@@ -283,6 +313,25 @@ void BotManager::tickBot(Bot& bot, SimulatedPlayer& sp) {
         }
         return;
     }
+    // Keep the head above water. Jumping does not lift a simulated player in deep water (it bobs
+    // and sinks); moving straight up does (seen with /kr debug rise*). A running job moves through
+    // water itself (PathJob swims toward its target with an upward component), so this only
+    // handles an idle bot.
+    bool probing = bot.job && bot.job->describe() == "debug rise";
+    auto eye     = sp.getEyePos();
+    bool eyesWet = sp.isInWater()
+                && sp.getDimensionBlockSource()
+                       .getBlock(BlockPos{(int)std::floor(eye.x), (int)std::floor(eye.y), (int)std::floor(eye.z)})
+                       .getMaterial()
+                       .mLiquid;
+    bool idle = !bot.job && !bot.reflex;
+    if (!probing && idle && eyesWet) {
+        sp.simulateWorldMove(Vec3{0, 1, 0}, 1.0f);
+        bot.surfacing = true;
+    } else if (bot.surfacing && (!eyesWet || !idle)) {
+        bot.surfacing = false;
+        if (idle) sp.simulateStopMoving();
+    }
     if (bot.respawnAt >= 0) {
         bot.respawnAt = -1;
         logger().info("{} respawned: {}", bot.name, describe(sp));
@@ -307,6 +356,7 @@ void BotManager::tickBot(Bot& bot, SimulatedPlayer& sp) {
         s.hasFood        = findFoodSlot(sp) >= 0;
         s.threatNear     = nearestMonster(sp, kThreatRadius) != nullptr;
         s.ticksSinceHurt = (int)std::min<int64_t>(mTick - bot.lastHurtTick, 1 << 30);
+        s.armed          = hasWeapon(sp);
 
         Reflex before = bot.arbiter.current();
         Reflex now    = bot.arbiter.choose(s);
@@ -317,7 +367,7 @@ void BotManager::tickBot(Bot& bot, SimulatedPlayer& sp) {
             }
             if (now != Reflex::None) {
                 if (bot.job) bot.job->pause(sp);
-                bot.reflex = now == Reflex::Fight ? makeAttack(std::nullopt, kThreatRadius) : makeEat();
+                bot.reflex = makeReflexJob(now);
             }
             emit(bot, "reflex", fmt::format("{} -> {}", toString(before), toString(now)));
             logger().info(
@@ -345,8 +395,7 @@ void BotManager::tickBot(Bot& bot, SimulatedPlayer& sp) {
     }
     if (bot.arbiter.current() != Reflex::None) {
         if (mTick >= bot.reflexRetryAt) {
-            bot.reflex = bot.arbiter.current() == Reflex::Fight ? makeAttack(std::nullopt, kThreatRadius)
-                                                                : makeEat();
+            bot.reflex = makeReflexJob(bot.arbiter.current());
         }
         return; // the job stays paused until the arbiter lets go
     }

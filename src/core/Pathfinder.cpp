@@ -19,6 +19,8 @@ char const* toString(Move m) {
         return "pillar";
     case Move::DigDown:
         return "dig-down";
+    case Move::Swim:
+        return "swim";
     }
     return "?";
 }
@@ -113,9 +115,18 @@ void Search::expand(WorldView const& w, Pos p) {
         return cell.breakTicks + Costs::breakExtra;
     };
 
+    // Feet in water with air above: the bot floats there without a floor.
+    auto floating = [&](Pos c) { return w.cell(c).kind == CellKind::Water && canOccupy(w.cell(c.up())); };
+
     for (auto const& d : kDirs) {
         Pos  n     = p + d;
         Cell floor = w.cell(n.down());
+
+        // Swim along the surface (from land or from water).
+        if (floating(n)) {
+            relax(p, Step{p, n, Move::Swim, {}, std::nullopt}, Costs::swim, sc);
+            continue;
+        }
 
         // Walk (breaking whatever is in the way), or bridge over a hole.
         {
@@ -144,10 +155,15 @@ void Search::expand(WorldView const& w, Pos p) {
 
         // Descend: walk off the edge and fall up to maxFall blocks (no digging on the way).
         if (canOccupy(w.cell(n)) && canOccupy(w.cell(n.up())) && canOccupy(floor)) {
-            for (int j = 2; j <= mOpt.maxFall + 1; ++j) {
+            for (int j = 2; j <= std::max(mOpt.maxFall + 1, mOpt.maxWaterFall + 1); ++j) {
                 Cell c = w.cell(n.down(j));
+                if (c.kind == CellKind::Water) { // a soft landing at any height up to maxWaterFall
+                    if (floating(n.down(j))) relax(p, Step{p, n.down(j), Move::Descend, {}, std::nullopt}, Costs::walk + Costs::swim, sc);
+                    break;
+                }
                 if (canStandOn(c)) {
-                    relax(p, Step{p, n.down(j - 1), Move::Descend, {}, std::nullopt}, Costs::walk + (j - 1) * Costs::fallPerBlock, sc);
+                    if (j <= mOpt.maxFall + 1)
+                        relax(p, Step{p, n.down(j - 1), Move::Descend, {}, std::nullopt}, Costs::walk + (j - 1) * Costs::fallPerBlock, sc);
                     break;
                 }
                 if (!canOccupy(c)) break;

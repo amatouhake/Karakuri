@@ -11,14 +11,17 @@ struct BodyState {
     bool  hasFood{false};
     bool  threatNear{false};      // a hostile mob within fighting range
     int   ticksSinceHurt{100000}; // ticks since the bot last took damage from an entity
+    bool  armed{true};            // holds or can switch to a weapon better than the hand
 };
 
-enum class Reflex { None, Fight, Eat };
+enum class Reflex { None, Flee, Fight, Eat };
 
 inline char const* toString(Reflex r) {
     switch (r) {
     case Reflex::None:
         return "none";
+    case Reflex::Flee:
+        return "flee";
     case Reflex::Fight:
         return "fight";
     case Reflex::Eat:
@@ -32,6 +35,10 @@ struct ReflexConfig {
     float eatStopHunger{17};    // keep eating until at least this
     int   fightAfterHurt{100};  // fight back if hurt by an entity within this many ticks
     int   fightCalmTicks{40};   // stop fighting after no threat for this long
+    float fleeHealth{6};        // run from a nearby threat at or below this health (20 = full)
+    float fleeHealthUnarmed{14}; // ...or this, without a weapon
+    float fleeStopHealth{12};   // ...until health is back to this, or
+    int   fleeCalmTicks{100};   // ...no threat has been near for this long
 };
 
 class ReflexArbiter {
@@ -39,6 +46,17 @@ public:
     explicit ReflexArbiter(ReflexConfig cfg = {}) : mCfg(cfg) {}
 
     Reflex choose(BodyState const& s) {
+        // Fleeing wins over everything: at low health a fight is likely lost.
+        if (mCurrent == Reflex::Flee) {
+            mCalm = s.threatNear ? 0 : mCalm + 1;
+            if (s.health < mCfg.fleeStopHealth && mCalm < mCfg.fleeCalmTicks) return mCurrent;
+            mCalm = 0;
+            mCurrent = Reflex::None; // fall through: maybe fight or eat now
+        } else if (s.threatNear && s.health <= (s.armed ? mCfg.fleeHealth : mCfg.fleeHealthUnarmed)) {
+            mCalm = 0;
+            return mCurrent = Reflex::Flee;
+        }
+
         // Fighting wins over eating: eating takes 1.6 s with no defense.
         bool provoked = s.threatNear && s.ticksSinceHurt <= mCfg.fightAfterHurt;
         if (mCurrent == Reflex::Fight) {

@@ -6,7 +6,8 @@
 // during `step`.
 //
 // A node is the block the bot's feet occupy. Moves are the four horizontal neighbors plus
-// straight up (pillar) and straight down (dig down). No diagonals and no swimming yet.
+// straight up (pillar) and straight down (dig down), and swimming along a water surface (feet in
+// water, head in air). No diagonals and no diving.
 
 #include <cstdint>
 #include <functional>
@@ -56,7 +57,7 @@ public:
     virtual Cell cell(Pos p) const = 0;
 };
 
-enum class Move : uint8_t { Walk, Ascend, Descend, Bridge, Pillar, DigDown };
+enum class Move : uint8_t { Walk, Ascend, Descend, Bridge, Pillar, DigDown, Swim };
 char const* toString(Move m);
 
 struct Step {
@@ -76,6 +77,7 @@ struct Options {
     bool  allowDig{true};
     int   scaffoldBlocks{0}; // blocks available for bridging and pillaring
     int   maxFall{3};
+    int   maxWaterFall{20}; // falls into water do no damage
     float heuristicWeight{1.2f};
 };
 
@@ -87,6 +89,7 @@ struct Costs {
     static constexpr float place      = 10;
     static constexpr float pillar     = 15;
     static constexpr float breakExtra = 5; // aiming and reach overhead per broken block
+    static constexpr float swim       = 12; // swimming is slow and leaves the bot exposed
 };
 
 enum class SearchState { Running, Found, Partial, NoPath };

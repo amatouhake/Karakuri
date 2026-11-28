@@ -130,6 +130,35 @@ void crafting() {
     check(craftsFor(5, 4) == 2 && craftsFor(4, 4) == 1 && craftsFor(1, 1) == 1, "crafts needed round up");
 }
 
+void reflexFlee() {
+    ReflexConfig cfg;
+    cfg.fleeCalmTicks = 2;
+    ReflexArbiter a(cfg);
+    BodyState     s;
+    s.threatNear     = true;
+    s.ticksSinceHurt = 1;
+    s.health         = 10;
+    check(a.choose(s) == Reflex::Fight, "healthy and hurt: fight");
+    s.health = 6;
+    check(a.choose(s) == Reflex::Flee, "low health with a threat: flee, even mid-fight");
+    s.health = 9;
+    check(a.choose(s) == Reflex::Flee, "keep fleeing until health recovers (hysteresis)");
+    s.threatNear = false;
+    check(a.choose(s) == Reflex::Flee, "calm tick 1 keeps fleeing");
+    check(a.choose(s) != Reflex::Flee, "stop fleeing after calm ticks");
+    s.threatNear = true;
+    s.health     = 12;
+    check(a.choose(s) == Reflex::Fight, "recovered with a threat: fight again");
+
+    ReflexArbiter b(cfg);
+    BodyState     u;
+    u.threatNear     = true;
+    u.ticksSinceHurt = 1;
+    u.health         = 14;
+    u.armed          = false;
+    check(b.choose(u) == Reflex::Flee, "unarmed: flee earlier instead of fighting");
+}
+
 void reach() {
     check(withinReach(0, 0, 0, 3, 4, 0, 5), "distance 5 is within reach 5");
     check(!withinReach(0, 0, 0, 3, 4, 0.1f, 5), "just over reach is out");
@@ -142,6 +171,7 @@ int main() {
     cooldown();
     reflexEat();
     reflexFight();
+    reflexFlee();
     reach();
     events();
     inventoryDiff();

@@ -29,6 +29,14 @@ int bestToolSlot(Player const& p, Block const& b);
 // Ticks to break `b` with the best hotbar tool; < 0 when it cannot be broken.
 float breakTicks(Player& p, Block const& b);
 
+// The hotbar slot with the highest attack damage (the selected slot when nothing beats the hand).
+int bestWeaponSlot(Player const& p);
+// Whether any hotbar item hits harder than the bare hand.
+bool hasWeapon(Player const& p);
+// The best hotbar slot that also gets the block's drops when the block needs a proper tool;
+// -1 when the block needs one and no hotbar item qualifies.
+int harvestSlot(Player const& p, Block const& b);
+
 // Hotbar slot holding a plain building block for bridging and pillaring, or -1.
 int  scaffoldSlot(Player const& p);
 int  scaffoldCount(Player const& p);

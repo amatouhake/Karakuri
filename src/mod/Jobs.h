@@ -53,6 +53,13 @@ std::unique_ptr<Job> makeSmelt(std::string item, int count);
 // Moves items between the inventory and a chest (the nearest one, or the one at `pos`).
 // An empty `item` means any item; count <= 0 means all.
 std::unique_ptr<Job> makeChest(bool put, std::string item, int count, std::optional<BlockPos> pos);
+// Runs from nearby monsters (L0 flee reflex): keeps walking away, pillars up when cornered.
+std::unique_ptr<Job> makeFlee();
+// Sleeps in a bed nearby (or one placed from the inventory) until morning. Night only.
+std::unique_ptr<Job> makeSleep();
+// Walls the bot in with scaffold blocks (four sides at feet and head height, and a roof) and
+// waits there until the job is stopped or replaced.
+std::unique_ptr<Job> makeShelter();
 // Walks over dropped items within `radius` until none are left (or none can be reached).
 std::unique_ptr<Job> makeCollect(float radius = 8.0f);
 // Attacks `target`, or the nearest monster within `radius` when no target is given.

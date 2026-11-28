@@ -2,6 +2,7 @@
 
 #include "mc/world/actor/player/Inventory.h"
 #include "mc/world/actor/player/Player.h"
+#include "mc/world/item/Item.h"
 #include "mc/world/item/ItemStack.h"
 #include "mc/world/level/BlockSource.h"
 #include "mc/world/level/block/Block.h"
@@ -84,6 +85,54 @@ float breakTicks(Player& p, Block const& b) {
     float best  = b.getDestroySpeed(inv.getItem(bestToolSlot(p, b)));
     float ratio = (held > 0 && best > held) ? held / best : 1.0f;
     return ratio / progress;
+}
+
+int bestWeaponSlot(Player const& p) {
+    auto& inv  = p.getInventory();
+    int   best = p.getSelectedItemSlot();
+    int   top  = 1; // the bare hand
+    for (int i = 0; i < 9; ++i) {
+        auto const& it = inv.getItem(i);
+        if (it.isNull()) continue;
+        Item const* item = it.mItem.get();
+        if (item && item->getAttackDamage() > top) {
+            top  = item->getAttackDamage();
+            best = i;
+        }
+    }
+    return best;
+}
+
+bool hasWeapon(Player const& p) {
+    auto& inv = p.getInventory();
+    for (int i = 0; i < 9; ++i) {
+        auto const& it = inv.getItem(i);
+        if (!it.isNull() && it.mItem.get() && it.mItem.get()->getAttackDamage() > 1) return true;
+    }
+    return false;
+}
+
+int harvestSlot(Player const& p, Block const& b) {
+    int fastest = bestToolSlot(p, b);
+    if (!b.getBlockType().mRequiresCorrectToolForDrops) return fastest;
+    auto& inv  = p.getInventory();
+    auto  gets = [&](int slot) {
+        auto const& it = inv.getItem(slot);
+        Item const* item = it.isNull() ? nullptr : it.mItem.get();
+        return item && item->canDestroySpecial(b);
+    };
+    if (gets(fastest)) return fastest;
+    int   best = -1;
+    float top  = -1;
+    for (int i = 0; i < 9; ++i) {
+        if (!gets(i)) continue;
+        float s = b.getDestroySpeed(inv.getItem(i));
+        if (s > top) {
+            top  = s;
+            best = i;
+        }
+    }
+    return best;
 }
 
 int scaffoldSlot(Player const& p) {
